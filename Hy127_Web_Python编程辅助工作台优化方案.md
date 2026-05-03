@@ -1,12 +1,12 @@
-# Code880 Web Python 编程辅助工作台优化方案
+# Hy127 Web Python 编程辅助工作台优化方案
 
 生成日期：2026-05-03  
-适用项目：`hy127v5.11_PythonWeb`  
-核心对象：`hy127web` 本地 Web 工作台
+适用项目：`Hy127v5.11_PythonWeb`  
+核心对象：`Hy127web` 本地 Web 工作台
 
 ## 1. 结论先行
 
-本项目当前的 `hy127web` 不是简单的“OpenAI SDK 调用示例”，也不是“Claude 壳子”。它更准确的定位是：
+本项目当前的 `Hy127web` 不是简单的“OpenAI SDK 调用示例”，也不是“Claude 壳子”。它更准确的定位是：
 
 > 面向 Python 项目的本地 Web 工作台本体。
 
@@ -31,8 +31,8 @@
 项目根目录中和 Web 工作台直接相关的核心结构如下：
 
 ```text
-hy127v5.11_PythonWeb/
-├── hy127web/
+Hy127v5.11_PythonWeb/
+├── Hy127web/
 │   ├── hub/
 │   │   ├── app.py              # Hub 主服务入口
 │   │   ├── auth.py             # 启动 token、session、CSRF
@@ -63,8 +63,8 @@ hy127v5.11_PythonWeb/
 
 其中：
 
-- `hy127web` 是 Web 工作台本体。
-- `src/一键安装卸载.py` 负责 Windows 一键安装环境，并部署 `hy127web`。
+- `Hy127web` 是 Web 工作台本体。
+- `src/一键安装卸载.py` 负责 Windows 一键安装环境，并部署 `Hy127web`。
 - `启动Web工作台.ps1` 是 Windows 下正式启动路径。
 - `方案设计/WEB端迁移方案_最终整合版_v4.md` 是当前设计基准。
 
@@ -154,7 +154,7 @@ Worker 是单项目服务，每个项目理论上一个独立 Worker 进程。
 
 ### 3.3 前端职责
 
-前端是 `hy127web/static/index.html` 中的单页应用，当前使用：
+前端是 `Hy127web/static/index.html` 中的单页应用，当前使用：
 
 - Vue 3
 - Monaco Editor
@@ -191,14 +191,14 @@ Worker 是单项目服务，每个项目理论上一个独立 Worker 进程。
 
 | 对象 | 所属层级 | 本质 | 解决的问题 |
 |---|---|---|---|
-| Code880 Web 路由架构 | 应用本体层 | 本地 Web 工作台 | 如何浏览、运行、管理 Python 项目 |
+| Hy127 Web 路由架构 | 应用本体层 | 本地 Web 工作台 | 如何浏览、运行、管理 Python 项目 |
 | OpenAI SDK | 模型调用层 | 官方 API 客户端 | 如何规范调用 OpenAI API |
 | Claude 壳子 | 外部 Agent 适配层 | 调用 Claude CLI 的包装 | 如何把任务交给 Claude CLI 执行 |
 
 更直观地说：
 
 ```text
-Code880 Web = 工作台骨架和手脚
+Hy127 Web = 工作台骨架和手脚
 OpenAI SDK  = 调 OpenAI 模型的客户端
 Claude 壳子 = 调 Claude CLI 的桥接器
 ```
@@ -249,14 +249,14 @@ Worker 管理
 文档预览
 ```
 
-这些仍然需要 Code880 Web 自己实现。
+这些仍然需要 Hy127 Web 自己实现。
 
 ### 4.4 Claude 壳子的价值和风险
 
 Claude 壳子通常是指：
 
 ```text
-Code880
+Hy127
   -> 启动 claude 命令
   -> 把用户任务和上下文交给 Claude CLI
   -> 读取 Claude CLI 输出
@@ -278,7 +278,7 @@ Code880
 - 出错恢复和日志追踪要自己补
 - 不同 CLI 版本行为可能变化
 
-因此 Claude/Codex/Qwen/Gemini CLI 更适合作为可插拔运行时，而不是替代 Code880 Web 的 Hub/Worker 架构。
+因此 Claude/Codex/Qwen/Gemini CLI 更适合作为可插拔运行时，而不是替代 Hy127 Web 的 Hub/Worker 架构。
 
 ## 5. 推荐总体架构
 
@@ -381,7 +381,7 @@ POST /api/files/save
 
 ### 7.2 前端需要补齐
 
-建议改造 `hy127web/static/index.html`：
+建议改造 `Hy127web/static/index.html`：
 
 - 将 Monaco `readOnly: true` 改为可编辑。
 - 监听内容变化，标记文件为 dirty。
@@ -744,9 +744,9 @@ scripts/dev_start_web.py
 
 职责：
 
-- 设置 `hy127web_INSTALL_ROOT`
-- 设置 `hy127web_PYTHON_PATH`
-- 设置 `hy127web_GLOBAL_DIR`
+- 设置 `Hy127web_INSTALL_ROOT`
+- 设置 `Hy127web_PYTHON_PATH`
+- 设置 `Hy127web_GLOBAL_DIR`
 - 启动 Hub
 - 读取 runtime
 - 读取 launch token
@@ -846,12 +846,12 @@ http://127.0.0.1:18800/bootstrap?code=...
 Web 页面只是 CLI 输出显示器
 ```
 
-这会削弱 Code880 自己的产品价值。
+这会削弱 Hy127 自己的产品价值。
 
 更稳妥的做法是：
 
 ```text
-先做强 Code880 Worker 工具
+先做强 Hy127 Worker 工具
 再让不同 AI Runtime 调这些工具
 ```
 
@@ -895,7 +895,7 @@ Git commit/push           强确认
 本项目的正确演进方向是：
 
 ```text
-Code880 Web 工作台本体
+Hy127 Web 工作台本体
   -> 做强项目文件、运行、预览、Git、环境能力
   -> 把这些能力抽象成稳定工具
   -> 接入 OpenAI SDK / Agents SDK / Claude CLI / Codex CLI 等运行时
@@ -904,7 +904,7 @@ Code880 Web 工作台本体
 
 一句话总结：
 
-> OpenAI SDK 和 Claude 壳子是可替换的大脑，Code880 Hub + Worker + 路由 + 文件/运行 API 才是这个 Python 编程工作台真正的身体。
+> OpenAI SDK 和 Claude 壳子是可替换的大脑，Hy127 Hub + Worker + 路由 + 文件/运行 API 才是这个 Python 编程工作台真正的身体。
 
 因此，近期不建议把主要精力放在“套 Claude 壳子”上。更应该先把本体打牢：
 
