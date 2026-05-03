@@ -1,0 +1,33 @@
+{
+    "version":  "0.2.0",
+    "configurations":  [
+                           {
+                               "name":  "当前文件 - 终端运行 (F5)",
+                               "type":  "debugpy",
+                               "request":  "launch",
+                               "program":  "${file}",
+                               "console":  "integratedTerminal",
+                               "python":  "${workspaceFolder}/.venv/Scripts/python.exe",
+                               "cwd":  "${workspaceFolder}"
+                           },
+                           {
+                               "name":  "运行主程序 src/main.py",
+                               "type":  "debugpy",
+                               "request":  "launch",
+                               "program":  "${workspaceFolder}/src/main.py",
+                               "console":  "integratedTerminal",
+                               "python":  "${workspaceFolder}/.venv/Scripts/python.exe",
+                               "cwd":  "${workspaceFolder}"
+                           },
+                           {
+                               "name":  "当前文件 - 调试控制台",
+                               "type":  "debugpy",
+                               "request":  "launch",
+                               "program":  "${file}",
+                               "console":  "internalConsole",
+                               "python":  "${workspaceFolder}/.venv/Scripts/python.exe",
+                               "cwd":  "${workspaceFolder}",
+                               "redirectOutput":  true
+                           }
+                       ]
+}

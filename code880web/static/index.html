@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code880 Web 工作台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
+<script src="/vendor/vue.global.prod.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@3/dist/vue.global.prod.js'"></script>
+<script src="/vendor/monaco/vs/loader.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js'"></script>
+<script src="/vendor/marked.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'"></script>
+<style>
+:root {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-hover: #37373d;
+  --bg-active: #094771;
+  --text-primary: #cccccc;
+  --text-secondary: #969696;
+  --text-bright: #ffffff;
+  --border-color: #3c3c3c;
+  --accent: #007acc;
+  --accent-hover: #1a8ad4;
+  --success: #4ec9b0;
+  --error: #f44747;
+  --warning: #cca700;
+  --scrollbar-bg: #1e1e1e;
+  --scrollbar-thumb: #424242;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; height: 100vh; }
+
+/* ── Layout ── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+.top-bar { display: flex; align-items: center; height: 36px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); padding: 0 12px; gap: 12px; flex-shrink: 0; }
+.top-bar .logo { font-weight: 600; color: var(--accent); font-size: 13px; }
+.top-bar .project-name { color: var(--text-secondary); font-size: 12px; }
+.top-bar .spacer { flex: 1; }
+.top-bar button { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; padding: 4px 8px; border-radius: 3px; }
+.top-bar button:hover { background: var(--bg-hover); color: var(--text-bright); }
+
+.main-area { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar (file tree) ── */
+.sidebar { width: 260px; min-width: 180px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-header { height: 34px; display: flex; align-items: center; padding: 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+.file-tree { flex: 1; overflow-y: auto; padding: 4px 0; font-size: 13px; }
+.tree-item { display: flex; align-items: center; padding: 2px 8px 2px calc(var(--indent, 0) * 16px + 8px); cursor: pointer; white-space: nowrap; height: 22px; }
+.tree-item:hover { background: var(--bg-hover); }
+.tree-item.active { background: var(--bg-active); }
+.tree-item .icon { width: 16px; margin-right: 4px; font-size: 12px; text-align: center; flex-shrink: 0; }
+.tree-item .name { overflow: hidden; text-overflow: ellipsis; }
+.tree-item .arrow { width: 16px; text-align: center; font-size: 10px; flex-shrink: 0; color: var(--text-secondary); }
+
+/* ── Center area ── */
+.center { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.editor-toolbar { height: 34px; display: flex; align-items: center; padding: 0 8px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); gap: 6px; flex-shrink: 0; }
+.editor-toolbar .tab { padding: 4px 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer; border-radius: 3px; display: flex; align-items: center; gap: 4px; }
+.editor-toolbar .tab.active { color: var(--text-bright); background: var(--bg-active); }
+.editor-toolbar .run-btn { background: var(--success); color: #000; border: none; padding: 3px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.editor-toolbar .run-btn:hover { opacity: 0.9; }
+.editor-toolbar .stop-btn { background: var(--error); color: #fff; border: none; padding: 3px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.editor-toolbar .stop-btn:hover { opacity: 0.9; }
+.editor-toolbar .run-select { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 3px; padding: 2px 6px; font-size: 12px; }
+
+.editor-area { flex: 1; overflow: hidden; position: relative; }
+.editor-area .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 14px; }
+.preview-area { flex: 1; overflow: auto; padding: 16px; background: var(--bg-primary); }
+.preview-area.word-preview { background: #fff; color: #333; }
+
+/* ── Terminal panel ── */
+.terminal-panel { height: 200px; min-height: 80px; background: var(--bg-secondary); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+.terminal-header { height: 28px; display: flex; align-items: center; padding: 0 12px; font-size: 11px; color: var(--text-secondary); background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); gap: 8px; }
+.terminal-header .tab { padding: 2px 8px; cursor: pointer; border-radius: 2px; }
+.terminal-header .tab.active { background: var(--bg-active); color: var(--text-bright); }
+.terminal-header .spacer { flex: 1; }
+.terminal-header button { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 11px; }
+.terminal-output { flex: 1; overflow-y: auto; padding: 8px 12px; font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace; font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
+.terminal-output .cmd { color: var(--success); }
+.terminal-output .error { color: var(--error); }
+.terminal-output .info { color: var(--accent); }
+.terminal-input-row { display: flex; align-items: center; padding: 4px 12px; border-top: 1px solid var(--border-color); }
+.terminal-input-row input { flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px; border-radius: 3px; }
+.terminal-input-row button { background: var(--accent); border: none; color: #fff; padding: 4px 12px; margin-left: 6px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+
+/* ── Right panel (AI chat) ── */
+.right-panel { width: 320px; min-width: 200px; background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+.right-panel.collapsed { width: 0; min-width: 0; overflow: hidden; border: none; }
+.chat-header { height: 34px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border-color); gap: 8px; }
+.chat-header .spacer { flex: 1; }
+.chat-header button { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 11px; }
+.model-badge { color: var(--success); border: 1px solid var(--border-color); border-radius: 3px; padding: 1px 6px; font-size: 11px; font-weight: 500; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.chat-msg { margin-bottom: 12px; }
+.chat-msg .role { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+.chat-msg .role.user { color: var(--accent); }
+.chat-msg .role.assistant { color: var(--success); }
+.chat-msg .body { font-size: 13px; line-height: 1.5; }
+.chat-msg .body pre { background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; margin: 6px 0; }
+.chat-msg .body code { font-family: 'Cascadia Code', monospace; font-size: 12px; }
+.chat-input-area { padding: 8px 12px; border-top: 1px solid var(--border-color); }
+.chat-input-area textarea { width: 100%; min-height: 60px; max-height: 120px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; font-size: 13px; resize: vertical; font-family: inherit; }
+.chat-input-area .send-row { display: flex; justify-content: flex-end; margin-top: 6px; gap: 6px; }
+.chat-input-area button { background: var(--accent); border: none; color: #fff; padding: 4px 16px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.chat-input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Context selector ── */
+.context-selector { padding: 6px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px; max-height: 120px; overflow-y: auto; }
+.context-selector label { display: block; padding: 1px 0; cursor: pointer; }
+.context-selector label input { margin-right: 4px; }
+.context-selector .hint { color: var(--text-secondary); margin-bottom: 4px; }
+.model-settings { padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 12px; display: grid; gap: 6px; }
+.model-settings label { display: grid; gap: 3px; color: var(--text-secondary); }
+.model-settings input, .model-settings select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
+.model-settings .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.model-settings .actions { display: flex; gap: 6px; justify-content: flex-end; }
+.model-settings button { background: var(--accent); border: none; color: #fff; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.model-settings button.secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+.model-settings .status { color: var(--text-secondary); font-size: 11px; min-height: 16px; }
+.ai-session-bar { padding: 8px 12px; border-bottom: 1px solid var(--border-color); display: grid; gap: 6px; font-size: 12px; }
+.ai-session-bar label { display: grid; gap: 3px; color: var(--text-secondary); }
+.ai-session-bar select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
+.ai-session-bar .row { display: grid; grid-template-columns: 1fr 110px; gap: 6px; }
+.ai-session-bar .hint { color: var(--warning); font-size: 11px; min-height: 14px; }
+.model-settings .section-title { color: var(--text-bright); font-weight: 600; font-size: 12px; margin-top: 2px; }
+.model-list { display: grid; gap: 4px; max-height: 120px; overflow-y: auto; }
+.model-card { border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 6px; cursor: pointer; display: grid; gap: 2px; }
+.model-card.active { border-color: var(--accent); background: rgba(0, 122, 204, 0.15); }
+.model-card .title { display: flex; align-items: center; gap: 6px; color: var(--text-bright); font-size: 12px; }
+.model-card .meta { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { border: 1px solid var(--border-color); border-radius: 999px; padding: 0 6px; color: var(--success); font-size: 10px; }
+.advanced-toggle { color: var(--accent); cursor: pointer; font-size: 11px; user-select: none; }
+.checkbox-row { display: flex; flex-wrap: wrap; gap: 8px; color: var(--text-secondary); }
+.checkbox-row label { display: flex; align-items: center; gap: 4px; }
+.checkbox-row input { width: auto; }
+.runtime-list { display: grid; gap: 4px; }
+.runtime-item { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 5px 6px; font-size: 11px; }
+.runtime-item .state { color: var(--text-secondary); white-space: nowrap; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-bg); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* ── Excel table ── */
+.excel-table { border-collapse: collapse; font-size: 13px; }
+.excel-table th, .excel-table td { border: 1px solid var(--border-color); padding: 4px 8px; text-align: left; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.excel-table th { background: var(--bg-tertiary); font-weight: 600; position: sticky; top: 0; }
+.excel-sheet-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.excel-sheet-tabs button { padding: 3px 10px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; border-radius: 3px; font-size: 12px; }
+.excel-sheet-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── PPT slides ── */
+.pptx-slide { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+.pptx-slide h4 { color: var(--accent); margin-bottom: 8px; font-size: 13px; }
+.pptx-slide p { margin-bottom: 4px; font-size: 13px; }
+
+/* ── Home page ── */
+.home-page { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+.home-page h1 { font-size: 24px; color: var(--text-bright); }
+.home-page p { color: var(--text-secondary); font-size: 14px; }
+.project-list { width: 400px; max-width: 90vw; }
+.project-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; }
+.project-card:hover { border-color: var(--accent); }
+.project-card .pname { font-weight: 600; margin-bottom: 4px; }
+.project-card .ppath { font-size: 12px; color: var(--text-secondary); word-break: break-all; }
+
+/* ── Context menu ── */
+.context-menu { position: fixed; z-index: 1000; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 0; min-width: 160px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+.context-menu-item { padding: 4px 16px; font-size: 13px; cursor: pointer; }
+.context-menu-item:hover { background: var(--bg-active); }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Home page (project list) -->
+  <template v-if="currentView === 'home'">
+    <div class="top-bar">
+      <span class="logo">Code880 Web</span>
+      <span class="spacer"></span>
+    </div>
+    <div class="home-page">
+      <h1>Code880 Web 工作台</h1>
+      <p>选择一个项目开始工作</p>
+      <div class="project-list">
+        <div class="project-card" v-for="p in projects" :key="p.workspace_id" @click="openProject(p)">
+          <div class="pname">{{ p.name }}</div>
+          <div class="ppath">{{ p.root_path }}</div>
+        </div>
+        <p v-if="projects.length === 0" style="text-align:center;color:var(--text-secondary);">
+          暂无已注册项目
+        </p>
+      </div>
+    </div>
+  </template>
+
+  <!-- Workspace view -->
+  <template v-else-if="currentView === 'workspace'">
+    <div class="top-bar">
+      <span class="logo">Code880</span>
+      <span class="project-name">{{ projectName }}</span>
+      <span class="spacer"></span>
+      <button @click="toggleAI">{{ showAI ? '隐藏 AI' : '显示 AI' }}</button>
+      <button @click="goHome">项目列表</button>
+    </div>
+    <div class="main-area">
+      <!-- File tree -->
+      <div class="sidebar">
+        <div class="sidebar-header">资源管理器</div>
+        <div class="file-tree">
+          <tree-node v-for="node in fileTree" :key="node.path" :node="node" :depth="0"
+            :active-path="activeFile?.path"
+            @select="onFileSelect"
+            @contextmenu="onFileContextMenu"
+            @toggle="onDirToggle" />
+        </div>
+      </div>
+
+      <!-- Center -->
+      <div class="center">
+        <div class="editor-toolbar">
+          <div class="tab" v-for="f in openFiles" :key="f.path"
+               :class="{active: activeFile?.path === f.path}"
+               @click="switchFile(f)">
+            {{ f.name }}
+            <span style="margin-left:4px;font-size:10px;color:var(--text-secondary)" @click.stop="closeFile(f)">✕</span>
+          </div>
+          <span class="spacer" style="flex:1"></span>
+          <template v-if="activeFile?.extension === '.py'">
+            <select class="run-select" v-model="selectedEntrypoint">
+              <option value="">当前文件</option>
+              <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}</option>
+            </select>
+            <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; 运行</button>
+            <button class="stop-btn" v-if="isRunning" @click="stopRun">&#9632; 停止</button>
+          </template>
+        </div>
+
+        <!-- Editor / Preview -->
+        <div class="editor-area" v-if="activeFile">
+          <template v-if="activeFile.viewType === 'code'">
+            <div id="monaco-editor" style="width:100%;height:100%"></div>
+          </template>
+          <template v-else-if="activeFile.viewType === 'preview'">
+            <div class="preview-area" :class="{'word-preview': activeFile.previewData?.type === 'word'}">
+              <!-- PDF -->
+              <template v-if="activeFile.previewData?.type === 'pdf'">
+                <iframe :src="getPreviewUrl(activeFile.path)" style="width:100%;height:100%;border:none;background:#fff;"></iframe>
+              </template>
+              <!-- Excel -->
+              <template v-else-if="activeFile.previewData?.type === 'excel'">
+                <div class="excel-sheet-tabs" v-if="activeFile.previewData.sheets?.length > 1">
+                  <button v-for="(s,i) in activeFile.previewData.sheets" :key="i"
+                    :class="{active: activeSheetIdx === i}" @click="activeSheetIdx = i">{{ s.name }}</button>
+                </div>
+                <div style="overflow:auto;max-height:calc(100% - 40px);">
+                  <table class="excel-table" v-if="currentSheet">
+                    <thead>
+                      <tr><th v-for="(c,ci) in currentSheet.rows[0] || []" :key="ci">{{ c }}</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(row,ri) in currentSheet.rows.slice(1)" :key="ri">
+                        <td v-for="(c,ci) in row" :key="ci">{{ c }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;">{{ activeFile.previewData.note }}</p>
+              </template>
+              <!-- Word -->
+              <template v-else-if="activeFile.previewData?.type === 'word'">
+                <div v-html="activeFile.previewData.html"></div>
+                <p style="font-size:11px;color:#999;margin-top:16px;">{{ activeFile.previewData.note }}</p>
+              </template>
+              <!-- PPTX -->
+              <template v-else-if="activeFile.previewData?.type === 'pptx'">
+                <div class="pptx-slide" v-for="slide in activeFile.previewData.slides" :key="slide.index">
+                  <h4>幻灯片 {{ slide.index }}</h4>
+                  <p v-for="(t,i) in slide.texts" :key="i">{{ t }}</p>
+                </div>
+                <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;">{{ activeFile.previewData.note }}</p>
+              </template>
+              <!-- Image -->
+              <template v-else-if="activeFile.previewData?.type === 'image'">
+                <img :src="'data:image/png;base64,' + activeFile.previewData.content_base64"
+                     style="max-width:100%;max-height:80vh;" />
+              </template>
+              <!-- Error -->
+              <template v-else-if="activeFile.previewData?.error">
+                <p style="color:var(--error);">{{ activeFile.previewData.error }}</p>
+              </template>
+            </div>
+          </template>
+        </div>
+        <div class="editor-area" v-else>
+          <div class="placeholder">选择文件开始编辑</div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="terminal-panel" v-if="showTerminal">
+          <div class="terminal-header">
+            <span class="tab active">输出</span>
+            <span class="spacer"></span>
+            <button @click="clearTerminal">清除</button>
+            <button @click="showTerminal = false">✕</button>
+          </div>
+          <div class="terminal-output" ref="terminalOutput">
+            <span v-for="(line,i) in terminalLines" :key="i" :class="line.cls">{{ line.text }}</span>
+          </div>
+          <div class="terminal-input-row" v-if="isRunning">
+            <input v-model="stdinInput" @keyup.enter="sendStdin" placeholder="输入内容..." />
+            <button @click="sendStdin">发送</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Panel -->
+      <div class="right-panel" :class="{collapsed: !showAI}">
+        <div class="chat-header">
+          AI 接入中心
+          <span class="model-badge">{{ currentModelLabel }}</span>
+          <span class="spacer"></span>
+          <button @click="toggleModelSettings">{{ showModelSettings ? '收起' : '设置' }}</button>
+          <button @click="startNewConversation">新对话</button>
+          <button @click="clearChat">清除</button>
+        </div>
+        <div class="ai-session-bar">
+          <div class="row">
+            <label>当前方案
+              <select v-model="currentProfileKey">
+                <optgroup label="直接 API">
+                  <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
+                </optgroup>
+                <optgroup label="Agent 运行方式（预留）">
+                  <option v-for="p in cliProfiles" :key="p.key" :value="p.key">{{ p.label }}</option>
+                </optgroup>
+              </select>
+            </label>
+            <label>思考强度
+              <select v-model="thinkingProfile">
+                <option value="max">最佳质量</option>
+                <option value="deep">深度</option>
+                <option value="standard">标准</option>
+                <option value="quick">快速</option>
+              </select>
+            </label>
+          </div>
+          <div class="hint">{{ currentProfileHint }}</div>
+        </div>
+        <div class="model-settings" v-if="showModelSettings">
+          <div class="section-title">模型服务</div>
+          <div class="model-list" v-if="models.length">
+            <div class="model-card" v-for="m in models" :key="m.id"
+                 :class="{active: modelForm.id === m.id}" @click="editModel(m)">
+              <div class="title">
+                <span>{{ m.name }}</span>
+                <span class="pill" v-if="m.is_default">默认</span>
+              </div>
+              <div class="meta">{{ providerName(m.provider) }} / {{ m.model_id }}</div>
+              <div class="meta">{{ m.roles?.join(' · ') || 'chat' }} · {{ m.api_key_masked || '未保存 Key' }}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="secondary" @click="newModel">新增模型</button>
+          </div>
+          <div class="row">
+            <label>服务商
+              <select v-model="modelForm.provider" @change="applyProviderPreset">
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai">OpenAI</option>
+                <option value="qwen">Qwen</option>
+                <option value="gemini">Gemini</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="custom">自定义</option>
+              </select>
+            </label>
+            <label>名称
+              <input v-model="modelForm.name" placeholder="DeepSeek Chat" />
+            </label>
+          </div>
+          <label>API Base
+            <input v-model="modelForm.api_base" placeholder="https://api.deepseek.com" />
+          </label>
+          <label>模型 ID
+            <input v-model="modelForm.model_id" placeholder="deepseek-chat" />
+          </label>
+          <label>API Key
+            <input v-model="modelForm.api_key" type="password" placeholder="保存后仅显示掩码；留空表示不修改" />
+          </label>
+          <div class="advanced-toggle" @click="showAdvancedModelSettings = !showAdvancedModelSettings">
+            {{ showAdvancedModelSettings ? '收起高级设置' : '高级设置（可不填）' }}
+          </div>
+          <template v-if="showAdvancedModelSettings">
+            <div class="row">
+              <label>协议
+                <select v-model="modelForm.protocol">
+                  <option value="openai_chat">OpenAI-compatible</option>
+                  <option value="anthropic_messages">Anthropic-compatible</option>
+                  <option value="gemini_openai">Gemini</option>
+                </select>
+              </label>
+              <label>默认思考
+                <select v-model="modelForm.reasoning_profile">
+                  <option value="max">最佳质量</option>
+                  <option value="deep">深度</option>
+                  <option value="standard">标准</option>
+                  <option value="quick">快速</option>
+                </select>
+              </label>
+            </div>
+            <div class="checkbox-row">
+              <label><input type="checkbox" value="chat" v-model="modelForm.roles" /> 对话</label>
+              <label><input type="checkbox" value="planner" v-model="modelForm.roles" /> 规划</label>
+              <label><input type="checkbox" value="executor" v-model="modelForm.roles" /> 执行</label>
+              <label><input type="checkbox" value="reviewer" v-model="modelForm.roles" /> 审核</label>
+            </div>
+            <div class="checkbox-row">
+              <label><input type="checkbox" v-model="modelForm.is_default" /> 设为默认模型</label>
+            </div>
+          </template>
+          <div class="actions">
+            <button class="secondary" @click="deleteModel" :disabled="!modelForm.id">删除</button>
+            <button class="secondary" @click="testModel" :disabled="!modelForm.id">测试</button>
+            <button @click="saveModel">保存</button>
+          </div>
+          <div class="status">{{ modelStatus }}</div>
+          <div class="section-title">运行方式预设</div>
+          <div class="runtime-list">
+            <div class="runtime-item" v-for="r in runtimes" :key="r.id">
+              <span>{{ r.name }}</span>
+              <span class="state">{{ runtimeState(r) }}</span>
+            </div>
+          </div>
+          <div class="status">Claude/Codex/Qwen/Gemini 壳子已预留；当前版本先启用直接 API 对话。</div>
+        </div>
+        <div class="context-selector">
+          <div class="hint">选择文件作为上下文:</div>
+          <label v-for="f in openFiles" :key="f.path">
+            <input type="checkbox" :value="f.path" v-model="contextFiles" @change="updateContext" />
+            {{ f.name }}
+          </label>
+        </div>
+        <div class="chat-messages" ref="chatMessages">
+          <div class="chat-msg" v-for="(msg,i) in chatHistory" :key="i">
+            <div class="role" :class="msg.role">{{ msg.role === 'user' ? '你' : 'AI' }}</div>
+            <div class="body" v-html="renderMd(msg.content)"></div>
+          </div>
+          <div class="chat-msg" v-if="aiStreaming">
+            <div class="role assistant">AI</div>
+            <div class="body" v-html="renderMd(streamBuffer)"></div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <textarea v-model="chatInput" @keydown.ctrl.enter="sendChat" placeholder="输入问题... (Ctrl+Enter 发送)"></textarea>
+          <div class="send-row">
+            <button @click="sendChat" :disabled="aiStreaming || !chatInput.trim()">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Context menu -->
+  <div class="context-menu" v-if="contextMenu.show" :style="{left: contextMenu.x+'px', top: contextMenu.y+'px'}">
+    <div class="context-menu-item" v-if="contextMenu.node?.extension === '.py'" @click="runContextFile">&#9654; 运行此文件</div>
+    <div class="context-menu-item" @click="copyPath">复制路径</div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } = Vue;
+
+const TreeNode = {
+  name: 'TreeNode',
+  props: ['node', 'depth', 'activePath'],
+  emits: ['select', 'contextmenu', 'toggle'],
+  template: `
+    <div>
+      <div class="tree-item" :class="{active: node.path === activePath}"
+           :style="{'--indent': depth}"
+           @click="onClick" @contextmenu.prevent="$emit('contextmenu', $event, node)">
+        <span class="arrow" v-if="node.type === 'directory'">{{ node._open ? '▾' : '▸' }}</span>
+        <span class="arrow" v-else></span>
+        <span class="icon">{{ icon }}</span>
+        <span class="name">{{ node.name }}</span>
+      </div>
+      <template v-if="node.type === 'directory' && node._open && node.children">
+        <tree-node v-for="child in node.children" :key="child.path" :node="child" :depth="depth+1"
+          :active-path="activePath" @select="$emit('select', $event)" @contextmenu="$emit('contextmenu', $event, $event)"
+          @toggle="$emit('toggle', $event)" />
+      </template>
+    </div>
+  `,
+  computed: {
+    icon() {
+      if (this.node.type === 'directory') return this.node._open ? '📂' : '📁';
+      const ext = this.node.extension || '';
+      const icons = {'.py':'🐍','.js':'📜','.json':'📋','.md':'📝','.html':'🌐','.css':'🎨','.pdf':'📕','.xlsx':'📊','.docx':'📄','.pptx':'📰','.png':'🖼️','.jpg':'🖼️','.bat':'⚙️','.ps1':'⚙️'};
+      return icons[ext] || '📄';
+    }
+  },
+  methods: {
+    onClick() {
+      if (this.node.type === 'directory') {
+        this.node._open = !this.node._open;
+        this.$emit('toggle', this.node);
+      } else {
+        this.$emit('select', this.node);
+      }
+    }
+  }
+};
+
+function getCsrf() {
+  const m = document.cookie.split('; ').find(c => c.startsWith('code880_csrf='));
+  return m ? m.split('=')[1] : '';
+}
+
+function apiFetch(url, opts = {}) {
+  const headers = { ...opts.headers };
+  if (['POST','PUT','DELETE','PATCH'].includes((opts.method||'GET').toUpperCase())) {
+    headers['X-Code880-CSRF'] = getCsrf();
+    if (!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
+  }
+  return fetch(url, { ...opts, headers, credentials: 'same-origin' });
+}
+
+createApp({
+  components: { TreeNode },
+  setup() {
+    const currentView = ref('home');
+    const workspaceId = ref('');
+    const projectName = ref('');
+    const projects = ref([]);
+    const fileTree = ref([]);
+    const openFiles = ref([]);
+    const activeFile = ref(null);
+    const entrypoints = ref([]);
+    const selectedEntrypoint = ref('');
+
+    // Terminal
+    const showTerminal = ref(false);
+    const terminalLines = ref([]);
+    const terminalOutput = ref(null);
+    const stdinInput = ref('');
+    const isRunning = ref(false);
+    const currentRunId = ref('');
+    let runWs = null;
+
+    // AI
+    const showAI = ref(true);
+    const chatHistory = ref([]);
+    const chatInput = ref('');
+    const aiStreaming = ref(false);
+    const streamBuffer = ref('');
+    const contextFiles = ref([]);
+    const chatMessages = ref(null);
+    const showModelSettings = ref(false);
+    const showAdvancedModelSettings = ref(false);
+    const modelStatus = ref('');
+    const models = ref([]);
+    const runtimes = ref([]);
+    const currentProfileKey = ref('');
+    const thinkingProfile = ref('max');
+    const modelForm = reactive({
+      id: '',
+      name: 'DeepSeek Chat',
+      provider: 'deepseek',
+      api_base: 'https://api.deepseek.com',
+      model_id: 'deepseek-chat',
+      api_key: '',
+      protocol: 'openai_chat',
+      runtime: 'api',
+      roles: ['chat'],
+      reasoning_profile: 'max',
+      is_default: false,
+    });
+
+    // Context menu
+    const contextMenu = reactive({ show: false, x: 0, y: 0, node: null });
+
+    // Monaco
+    let monacoEditor = null;
+    const activeSheetIdx = ref(0);
+
+    const currentSheet = computed(() => {
+      if (!activeFile.value?.previewData?.sheets) return null;
+      return activeFile.value.previewData.sheets[activeSheetIdx.value];
+    });
+    const providerLabels = {
+      deepseek: 'DeepSeek',
+      openai: 'OpenAI',
+      qwen: 'Qwen',
+      gemini: 'Gemini',
+      anthropic: 'Anthropic',
+      openrouter: 'OpenRouter',
+      custom: 'Custom',
+    };
+    const apiProfiles = computed(() => {
+      const enabled = models.value.filter(m => m.enabled !== false);
+      if (!enabled.length) return [{ key: '', label: '请先添加 API 模型', disabled: true }];
+      return enabled.map(m => ({
+        key: `api:${m.id}`,
+        label: `${m.name} · ${m.model_id}`,
+        model: m,
+      }));
+    });
+    const cliProfiles = computed(() => runtimes.value
+      .filter(r => r.id !== 'api')
+      .map(r => ({
+        key: `${r.id}:`,
+        label: `${r.name} · ${r.available ? '已检测' : '未检测'} · 预留`,
+        runtime: r,
+      })));
+    const selectedProfile = computed(() => {
+      const [runtime, modelId] = (currentProfileKey.value || '').split(':');
+      return { runtime: runtime || 'api', modelId: modelId || '' };
+    });
+    const selectedModel = computed(() =>
+      models.value.find(m => m.id === selectedProfile.value.modelId) || null
+    );
+    const currentModelLabel = computed(() => {
+      if (selectedProfile.value.runtime !== 'api') {
+        const rt = runtimes.value.find(r => r.id === selectedProfile.value.runtime);
+        return rt ? `${rt.name} / 预留` : 'Agent 预留';
+      }
+      const model = selectedModel.value;
+      if (!model) return 'AI 未配置';
+      return `${providerName(model.provider)} / ${model.model_id || 'model'}`;
+    });
+    const currentProfileHint = computed(() => {
+      if (!currentProfileKey.value) return '请先在设置中添加一个 API 模型。';
+      if (selectedProfile.value.runtime !== 'api') {
+        const rt = runtimes.value.find(r => r.id === selectedProfile.value.runtime);
+        return `${rt?.name || 'Agent'} 壳子已预留；当前版本先启用直接 API 对话。`;
+      }
+      const model = selectedModel.value;
+      if (!model) return '';
+      return `本次对话使用 ${model.name}，思考强度默认为最佳质量，可随时切换方案。`;
+    });
+
+    const wsBase = computed(() => `/api/workspaces/${workspaceId.value}`);
+
+    // ── Init ──
+    onMounted(async () => {
+      const pathMatch = window.location.pathname.match(/^\/w\/(.+)/);
+      if (pathMatch) {
+        workspaceId.value = pathMatch[1];
+        currentView.value = 'workspace';
+        await loadWorkspace();
+      } else {
+        await loadProjects();
+      }
+      document.addEventListener('click', () => { contextMenu.show = false; });
+      document.addEventListener('keydown', onGlobalKey);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener('keydown', onGlobalKey);
+      if (runWs) runWs.close();
+    });
+
+    function onGlobalKey(e) {
+      if ((e.key === 'F5' || (e.ctrlKey && e.key === 'F5')) && activeFile.value?.extension === '.py') {
+        e.preventDefault();
+        if (isRunning.value) stopRun(); else runFile();
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const resp = await apiFetch('/api/hub/projects');
+        const data = await resp.json();
+        projects.value = data.projects || [];
+      } catch(e) { console.error(e); }
+    }
+
+    function openProject(p) {
+      workspaceId.value = p.workspace_id;
+      projectName.value = p.name;
+      currentView.value = 'workspace';
+      history.pushState(null, '', `/w/${p.workspace_id}`);
+      loadWorkspace();
+    }
+
+    function goHome() {
+      currentView.value = 'home';
+      history.pushState(null, '', '/');
+      loadProjects();
+    }
+
+    async function loadWorkspace() {
+      try {
+        const [treeResp, infoResp, epResp] = await Promise.all([
+          apiFetch(`${wsBase.value}/files/tree`),
+          apiFetch(`${wsBase.value}/info`),
+          apiFetch(`${wsBase.value}/entrypoints`),
+        ]);
+        const treeData = await treeResp.json();
+        fileTree.value = markReactive(treeData.tree || []);
+        const infoData = await infoResp.json();
+        projectName.value = infoData.name || '';
+        const epData = await epResp.json();
+        entrypoints.value = epData.entrypoints || [];
+        await Promise.all([loadModels(), loadRuntimes()]);
+      } catch(e) { console.error(e); }
+    }
+
+    function markReactive(nodes) {
+      return nodes.map(n => {
+        n._open = false;
+        if (n.children) n.children = markReactive(n.children);
+        return n;
+      });
+    }
+
+    async function onDirToggle(node) {
+      if (node._open && node.has_children && (!node.children || node.children.length === 0)) {
+        const resp = await apiFetch(`${wsBase.value}/files/tree?path=${encodeURIComponent(node.path)}&depth=2`);
+        const data = await resp.json();
+        node.children = markReactive(data.tree || []);
+      }
+    }
+
+    async function onFileSelect(node) {
+      const existing = openFiles.value.find(f => f.path === node.path);
+      if (existing) {
+        activeFile.value = existing;
+        if (existing.viewType === 'code') await loadMonaco(existing);
+        return;
+      }
+
+      const ext = node.extension || '';
+      const previewExts = ['.pdf','.xlsx','.docx','.pptx'];
+      const imageExts = ['.png','.jpg','.jpeg','.gif','.bmp','.svg','.webp'];
+
+      if (previewExts.includes(ext)) {
+        const resp = await apiFetch(`${wsBase.value}/preview/${encodeURIComponent(node.path)}`);
+        const data = await resp.json();
+        const file = { ...node, viewType: 'preview', previewData: data };
+        openFiles.value.push(file);
+        activeFile.value = file;
+        activeSheetIdx.value = 0;
+      } else if (imageExts.includes(ext)) {
+        const resp = await apiFetch(`${wsBase.value}/files/content?path=${encodeURIComponent(node.path)}`);
+        const data = await resp.json();
+        const file = { ...node, viewType: 'preview', previewData: data };
+        openFiles.value.push(file);
+        activeFile.value = file;
+      } else {
+        const resp = await apiFetch(`${wsBase.value}/files/content?path=${encodeURIComponent(node.path)}`);
+        const data = await resp.json();
+        const file = { ...node, viewType: 'code', content: data.content, sha256: data.sha256 };
+        openFiles.value.push(file);
+        activeFile.value = file;
+        await loadMonaco(file);
+      }
+    }
+
+    function switchFile(f) {
+      activeFile.value = f;
+      if (f.viewType === 'code') nextTick(() => loadMonaco(f));
+    }
+
+    function closeFile(f) {
+      const idx = openFiles.value.indexOf(f);
+      openFiles.value.splice(idx, 1);
+      if (activeFile.value === f) {
+        activeFile.value = openFiles.value[Math.min(idx, openFiles.value.length - 1)] || null;
+        if (activeFile.value?.viewType === 'code') nextTick(() => loadMonaco(activeFile.value));
+      }
+    }
+
+    async function loadMonaco(file) {
+      await nextTick();
+      const container = document.getElementById('monaco-editor');
+      if (!container) return;
+
+      if (!window.monaco) {
+        await new Promise((resolve) => {
+          const monacoLocalPath = '/vendor/monaco/vs';
+          const monacoCdnPath = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs';
+          require.config({ paths: { 'vs': monacoLocalPath }, waitSeconds: 5 });
+          require(['vs/editor/editor.main'], () => resolve());
+        });
+      }
+
+      if (monacoEditor) monacoEditor.dispose();
+
+      const langMap = {'.py':'python','.js':'javascript','.ts':'typescript','.json':'json','.html':'html','.css':'css','.md':'markdown','.yaml':'yaml','.yml':'yaml','.toml':'ini','.xml':'xml','.bat':'bat','.ps1':'powershell','.sh':'shell','.sql':'sql','.csv':'plaintext','.log':'plaintext','.txt':'plaintext'};
+      const lang = langMap[file.extension] || 'plaintext';
+
+      monacoEditor = window.monaco.editor.create(container, {
+        value: file.content || '',
+        language: lang,
+        theme: 'vs-dark',
+        readOnly: true,
+        minimap: { enabled: true },
+        fontSize: 14,
+        lineNumbers: 'on',
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        wordWrap: 'on',
+      });
+    }
+
+    // ── Run ──
+    async function runFile() {
+      const program = selectedEntrypoint.value || activeFile.value?.path;
+      if (!program) return;
+
+      showTerminal.value = true;
+      terminalLines.value = [];
+      addTerminalLine(`> python ${program}\n`, 'cmd');
+
+      try {
+        const resp = await apiFetch(`${wsBase.value}/run`, {
+          method: 'POST',
+          body: JSON.stringify({ program }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { addTerminalLine(`错误: ${data.detail || JSON.stringify(data)}\n`, 'error'); return; }
+        currentRunId.value = data.run_id;
+        isRunning.value = true;
+        connectRunWs(data.run_id);
+      } catch(e) {
+        addTerminalLine(`请求失败: ${e}\n`, 'error');
+      }
+    }
+
+    function connectRunWs(runId) {
+      if (runWs) runWs.close();
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const url = `${proto}//${location.host}/ws/workspaces/${workspaceId.value}/run/${runId}`;
+      runWs = new WebSocket(url);
+      runWs.onmessage = (evt) => {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === 'run_output') addTerminalLine(msg.data);
+        else if (msg.type === 'run_error') addTerminalLine(msg.data, 'error');
+        else if (msg.type === 'run_finished') {
+          const code = msg.exit_code;
+          const cls = code === 0 ? 'info' : 'error';
+          addTerminalLine(`\n[进程已结束, 退出码: ${code}]  耗时: ${msg.elapsed}s\n`, cls);
+          isRunning.value = false;
+          currentRunId.value = '';
+        }
+      };
+      runWs.onclose = () => { isRunning.value = false; };
+    }
+
+    async function stopRun() {
+      if (!currentRunId.value) return;
+      await apiFetch(`${wsBase.value}/run/${currentRunId.value}/stop`, { method: 'POST' });
+    }
+
+    async function sendStdin() {
+      if (!stdinInput.value || !currentRunId.value) return;
+      if (runWs && runWs.readyState === WebSocket.OPEN) {
+        runWs.send(JSON.stringify({ type: 'stdin', input: stdinInput.value }));
+        stdinInput.value = '';
+      }
+    }
+
+    function addTerminalLine(text, cls = '') {
+      terminalLines.value.push({ text, cls });
+      nextTick(() => {
+        if (terminalOutput.value) terminalOutput.value.scrollTop = terminalOutput.value.scrollHeight;
+      });
+    }
+
+    function clearTerminal() { terminalLines.value = []; }
+
+    // ── AI Chat ──
+    async function sendChat() {
+      const msg = chatInput.value.trim();
+      if (!msg || aiStreaming.value) return;
+      if (!currentProfileKey.value) {
+        chatHistory.value.push({ role: 'assistant', content: '请先在设置中添加一个 API 模型。' });
+        return;
+      }
+      if (selectedProfile.value.runtime !== 'api') {
+        const rt = runtimes.value.find(r => r.id === selectedProfile.value.runtime);
+        chatHistory.value.push({
+          role: 'assistant',
+          content: `${rt?.name || 'Agent'} 运行方式已预留，CLI 桥接会在下一阶段启用。当前请先选择“直接 API”方案。`,
+        });
+        return;
+      }
+      chatHistory.value.push({ role: 'user', content: msg });
+      chatInput.value = '';
+      aiStreaming.value = true;
+      streamBuffer.value = '';
+
+      try {
+        const resp = await apiFetch(`${wsBase.value}/ai/chat`, {
+          method: 'POST',
+          body: JSON.stringify({
+            message: msg,
+            model_id: selectedProfile.value.modelId,
+            runtime: selectedProfile.value.runtime,
+            thinking_profile: thinkingProfile.value,
+          }),
+        });
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const chunk = JSON.parse(line);
+              if (chunk.type === 'content') streamBuffer.value += chunk.data;
+              else if (chunk.type === 'error') streamBuffer.value += `\n\n错误: ${chunk.data}`;
+            } catch(e) {}
+          }
+          scrollChat();
+        }
+      } catch(e) {
+        streamBuffer.value += `\n\n请求失败: ${e}`;
+      }
+
+      chatHistory.value.push({ role: 'assistant', content: streamBuffer.value });
+      aiStreaming.value = false;
+      streamBuffer.value = '';
+      scrollChat();
+    }
+
+    function clearChat() { chatHistory.value = []; }
+    function startNewConversation() {
+      chatHistory.value = [];
+      chatInput.value = '';
+      streamBuffer.value = '';
+      aiStreaming.value = false;
+    }
+    function toggleAI() { showAI.value = !showAI.value; }
+    function scrollChat() {
+      nextTick(() => {
+        if (chatMessages.value) chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+      });
+    }
+
+    function toggleModelSettings() {
+      showModelSettings.value = !showModelSettings.value;
+      if (showModelSettings.value) Promise.all([loadModels(), loadRuntimes()]);
+    }
+
+    function providerName(provider) {
+      return providerLabels[provider] || provider || 'Custom';
+    }
+
+    function runtimeState(runtime) {
+      if (runtime.implemented) return '已启用';
+      return `${runtime.available ? '已检测' : '未检测'} · 预留`;
+    }
+
+    function resetModelForm() {
+      Object.assign(modelForm, {
+        id: '',
+        name: 'DeepSeek Chat',
+        provider: 'deepseek',
+        api_base: 'https://api.deepseek.com',
+        model_id: 'deepseek-chat',
+        api_key: '',
+        protocol: 'openai_chat',
+        runtime: 'api',
+        roles: ['chat'],
+        reasoning_profile: 'max',
+        is_default: models.value.length === 0,
+      });
+    }
+
+    function newModel() {
+      resetModelForm();
+      modelStatus.value = '正在新增模型，请填写 API Key 后保存';
+    }
+
+    function editModel(model) {
+      Object.assign(modelForm, {
+        id: model.id,
+        name: model.name || '',
+        provider: model.provider || 'custom',
+        api_base: model.api_base || '',
+        model_id: model.model_id || '',
+        api_key: '',
+        protocol: model.protocol || 'openai_chat',
+        runtime: model.runtime || 'api',
+        roles: Array.isArray(model.roles) ? [...model.roles] : ['chat'],
+        reasoning_profile: model.reasoning_profile || 'max',
+        is_default: !!model.is_default,
+      });
+      modelStatus.value = `已选择: ${model.name} (${model.api_key_masked || 'key 已保存'})`;
+    }
+
+    function ensureCurrentProfile() {
+      if (currentProfileKey.value && selectedProfile.value.runtime !== 'api') return;
+      if (currentProfileKey.value && apiProfiles.value.some(p => p.key === currentProfileKey.value)) return;
+      const model = models.value.find(m => m.is_default && m.enabled !== false)
+        || models.value.find(m => m.enabled !== false);
+      currentProfileKey.value = model ? `api:${model.id}` : '';
+    }
+
+    function applyProviderPreset() {
+      const presets = {
+        deepseek: {
+          name: 'DeepSeek Reasoner',
+          api_base: 'https://api.deepseek.com',
+          model_id: 'deepseek-reasoner',
+          protocol: 'openai_chat',
+          roles: ['chat', 'planner', 'reviewer'],
+        },
+        openai: {
+          name: 'OpenAI',
+          api_base: 'https://api.openai.com/v1',
+          model_id: 'gpt-4o-mini',
+          protocol: 'openai_chat',
+          roles: ['chat'],
+        },
+        qwen: {
+          name: 'Qwen',
+          api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          model_id: 'qwen-plus',
+          protocol: 'openai_chat',
+          roles: ['chat', 'planner'],
+        },
+        gemini: {
+          name: 'Gemini',
+          api_base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+          model_id: 'gemini-2.5-pro',
+          protocol: 'openai_chat',
+          roles: ['chat', 'planner'],
+        },
+        anthropic: {
+          name: 'Anthropic Claude',
+          api_base: 'https://api.anthropic.com',
+          model_id: 'claude-sonnet-4-5',
+          protocol: 'anthropic_messages',
+          roles: ['chat', 'planner', 'reviewer'],
+        },
+        openrouter: {
+          name: 'OpenRouter',
+          api_base: 'https://openrouter.ai/api/v1',
+          model_id: 'openai/gpt-4o-mini',
+          protocol: 'openai_chat',
+          roles: ['chat'],
+        },
+      };
+      const preset = presets[modelForm.provider];
+      if (!preset) return;
+      Object.assign(modelForm, {
+        ...preset,
+        runtime: 'api',
+        reasoning_profile: 'max',
+      });
+    }
+
+    async function loadModels() {
+      try {
+        const resp = await apiFetch('/api/hub/models');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        models.value = data.models || [];
+        const model = models.value.find(m => m.is_default && m.enabled !== false)
+          || models.value.find(m => m.enabled !== false)
+          || models.value[0];
+        if (model) {
+          editModel(model);
+        } else {
+          resetModelForm();
+          modelStatus.value = '尚未配置模型';
+        }
+        ensureCurrentProfile();
+      } catch(e) {
+        modelStatus.value = `读取模型失败: ${e}`;
+      }
+    }
+
+    async function loadRuntimes() {
+      try {
+        const resp = await apiFetch('/api/hub/runtimes');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        runtimes.value = data.runtimes || [];
+      } catch(e) {
+        runtimes.value = [];
+      }
+    }
+
+    async function saveModel() {
+      if (!modelForm.name || !modelForm.api_base || !modelForm.model_id) {
+        modelStatus.value = '请填写名称、API Base 和模型 ID';
+        return;
+      }
+      if (!modelForm.id && !modelForm.api_key) {
+        modelStatus.value = '首次保存必须填写 API Key';
+        return;
+      }
+      const body = {
+        name: modelForm.name,
+        provider: modelForm.provider,
+        api_base: modelForm.api_base.replace(/\/+$/, ''),
+        model_id: modelForm.model_id,
+        protocol: modelForm.protocol,
+        runtime: 'api',
+        roles: modelForm.roles.length ? modelForm.roles : ['chat'],
+        reasoning_profile: modelForm.reasoning_profile || 'max',
+        is_default: !!modelForm.is_default,
+        orchestration: { enabled: false },
+      };
+      if (modelForm.id) body.id = modelForm.id;
+      if (modelForm.api_key) body.api_key = modelForm.api_key;
+
+      modelStatus.value = '正在保存...';
+      try {
+        const resp = await apiFetch('/api/hub/models', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          modelStatus.value = data.detail || JSON.stringify(data);
+          return;
+        }
+        modelForm.id = data.id;
+        modelForm.api_key = '';
+        await loadModels();
+        currentProfileKey.value = `api:${data.id}`;
+        modelStatus.value = `已保存: ${data.name} (${data.api_key_masked || 'key 已保存'})`;
+      } catch(e) {
+        modelStatus.value = `保存失败: ${e}`;
+      }
+    }
+
+    async function deleteModel() {
+      if (!modelForm.id) return;
+      modelStatus.value = '正在删除...';
+      try {
+        const resp = await apiFetch(`/api/hub/models/${modelForm.id}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (!resp.ok) {
+          modelStatus.value = data.detail || JSON.stringify(data);
+          return;
+        }
+        resetModelForm();
+        await loadModels();
+        modelStatus.value = '已删除';
+      } catch(e) {
+        modelStatus.value = `删除失败: ${e}`;
+      }
+    }
+
+    async function testModel() {
+      if (!modelForm.id) {
+        modelStatus.value = '请先保存模型配置';
+        return;
+      }
+      modelStatus.value = '正在测试...';
+      try {
+        const resp = await apiFetch(`/api/hub/models/${modelForm.id}/test`, { method: 'POST' });
+        const data = await resp.json();
+        modelStatus.value = data.ok ? '测试通过' : `测试失败: ${data.error || JSON.stringify(data)}`;
+      } catch(e) {
+        modelStatus.value = `测试失败: ${e}`;
+      }
+    }
+
+    async function updateContext() {
+      await apiFetch(`${wsBase.value}/ai/context`, {
+        method: 'POST',
+        body: JSON.stringify({ files: contextFiles.value }),
+      });
+    }
+
+    function renderMd(text) {
+      if (!text) return '';
+      try { return marked.parse(text); } catch(e) { return text; }
+    }
+
+    // ── Context menu ──
+    function onFileContextMenu(evt, node) {
+      contextMenu.show = true;
+      contextMenu.x = evt.clientX;
+      contextMenu.y = evt.clientY;
+      contextMenu.node = node;
+    }
+
+    function runContextFile() {
+      contextMenu.show = false;
+      if (contextMenu.node?.extension === '.py') {
+        selectedEntrypoint.value = contextMenu.node.path;
+        runFile();
+      }
+    }
+
+    function copyPath() {
+      contextMenu.show = false;
+      if (contextMenu.node) navigator.clipboard.writeText(contextMenu.node.path);
+    }
+
+    function getPreviewUrl(path) {
+      return `${wsBase.value}/preview-stream?path=${encodeURIComponent(path)}`;
+    }
+
+    return {
+      currentView, workspaceId, projectName, projects, fileTree,
+      openFiles, activeFile, entrypoints, selectedEntrypoint,
+      showTerminal, terminalLines, terminalOutput, stdinInput, isRunning, currentRunId,
+      showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
+      showModelSettings, showAdvancedModelSettings, modelForm, modelStatus,
+      models, runtimes, currentProfileKey, thinkingProfile,
+      apiProfiles, cliProfiles, currentProfileHint,
+      contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
+      openProject, goHome, loadWorkspace, onFileSelect, onDirToggle,
+      switchFile, closeFile, runFile, stopRun, sendStdin, clearTerminal,
+      sendChat, clearChat, startNewConversation, toggleAI, toggleModelSettings, applyProviderPreset,
+      loadModels, loadRuntimes, saveModel, testModel, deleteModel, newModel, editModel,
+      providerName, runtimeState, updateContext, renderMd,
+      onFileContextMenu, runContextFile, copyPath, getPreviewUrl,
+      addTerminalLine,
+    };
+  }
+}).component('TreeNode', TreeNode).mount('#app');
+</script>
+</body>
+</html>

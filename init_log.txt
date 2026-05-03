@@ -1,0 +1,260 @@
+============================================
+  Initialization Log - 2026-04-28 16:16:21
+============================================
+Project root: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移
+Script path: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\重新初始化 V1.24.ps1
+Log file: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\init_log.txt
+User: Hyman
+PowerShell: 5.1.19041.6456
+
+
+[2026-04-28 16:16:22] ==================================================
+[2026-04-28 16:16:23] ========== PROJECT IDENTIFICATION ==========
+[2026-04-28 16:16:24] ==================================================
+[2026-04-28 16:16:26] Original folder name: code880_temp_v5.11_还原_标准_Web迁移
+[2026-04-28 16:16:26] Project name will be: code_2838
+
+[2026-04-28 16:16:26] ==================================================
+[2026-04-28 16:16:26] ========== PYPROJECT UPDATE ==========
+[2026-04-28 16:16:26] ==================================================
+[2026-04-28 16:16:27] >>> BEGIN PYPROJECT UPDATE OUTPUT <<<
+[2026-04-28 16:16:27] pyproject.toml updated successfully
+[2026-04-28 16:16:27] <<< END PYPROJECT UPDATE OUTPUT (exit 0) >>>
+
+[2026-04-28 16:16:28] ==================================================
+[2026-04-28 16:16:28] ========== ENVIRONMENT RESET ==========
+[2026-04-28 16:16:28] ==================================================
+[2026-04-28 16:16:28] Keeping uv.lock to preserve dependency reproducibility.
+[2026-04-28 16:16:28] Removed .venv
+[2026-04-28 16:16:28] Cleaned .venv; uv.lock was preserved when present.
+
+[2026-04-28 16:16:28] ==================================================
+[2026-04-28 16:16:28] ========== DEPENDENCY SYNC ==========
+[2026-04-28 16:16:29] ==================================================
+[2026-04-28 16:16:29] Reinstalling dependencies (offline)...
+[2026-04-28 16:16:29] >>> BEGIN UV ATTEMPT: OFFLINE OUTPUT <<<
+[2026-04-28 16:16:29] Command: uv sync --offline --cache-dir C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\.uv-cache
+Using CPython 3.12.10 interpreter at: C:\PythonDev\python\python\python.exe
+Creating virtual environment at: .venv
+Resolved 26 packages in 531ms
+  × Failed to download `numpy==2.4.4`
+  ╰─▶ Network connectivity is disabled, but the
+      requested data wasn't found in the cache for:
+      `https://files.pythonhosted.org/packages/2d/5b/e1deebf88ff431b01b7406ca3583ab2bbb90972bbe1c568732e49c844f7e/numpy-2.4.4-cp312-cp312-win_amd64.whl`
+  help: `numpy` (v2.4.4) was included because `code-2838` (v0.1.0) depends on
+        `pandas` (v3.0.2) which depends on `numpy`
+[2026-04-28 16:16:34] <<< END UV ATTEMPT: OFFLINE OUTPUT (exit 1) >>>
+[2026-04-28 16:16:34] [WARN] Offline sync failed, retrying with mirror index...
+[2026-04-28 16:16:34] >>> BEGIN UV ATTEMPT: MIRROR OUTPUT <<<
+[2026-04-28 16:16:34] Command: uv sync --cache-dir C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\.uv-cache
+Resolved 26 packages in 7ms
+Downloading pandas (9.3MiB)
+Downloading numpy (11.7MiB)
+Downloading pywin32 (9.1MiB)
+ Downloading pywin32
+ Downloading pandas
+ Downloading numpy
+Prepared 3 packages in 54.05s
+Installed 21 packages in 4.83s
+ + altgraph==0.17.5
+ + arrow==1.4.0
+ + et-xmlfile==2.0.0
+ + numpy==2.4.4
+ + openpyxl==3.1.5
+ + packaging==26.1
+ + pandas==3.0.2
+ + pefile==2024.8.26
+ + pillow==12.2.0
+ + psutil==7.2.2
+ + pyinstaller==6.20.0
+ + pyinstaller-hooks-contrib==2026.4
+ + pypinyin==0.55.0
+ + python-dateutil==2.9.0.post0
+ + pywin32==311
+ + pywin32-ctypes==0.2.3
+ + screeninfo==0.8.1
+ + setuptools==82.0.1
+ + six==1.17.0
+ + ttkbootstrap==1.20.2
+ + tzdata==2026.1
+[2026-04-28 16:17:38] <<< END UV ATTEMPT: MIRROR OUTPUT (exit 0) >>>
+[2026-04-28 16:17:38] uv sync final exit code: 0
+
+[2026-04-28 16:17:38] ==================================================
+[2026-04-28 16:17:39] ========== HY127 DEPLOYMENT ==========
+[2026-04-28 16:17:40] ==================================================
+[2026-04-28 16:17:41] Running __hy127\init.bat...
+[2026-04-28 16:17:42] >>> BEGIN __hy127 DEPLOYMENT OUTPUT <<<
+Copying from: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\__hy127
+Copying to:   C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\.venv\Lib\site-packages\hy127
+
+
+Done copying hy127 to C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\.venv\Lib\site-packages
+[2026-04-28 16:17:48] <<< END __hy127 DEPLOYMENT OUTPUT >>>
+[2026-04-28 16:17:48] __hy127 library deployed successfully
+[2026-04-28 16:17:48] __hy127 init exit code: 0
+
+[2026-04-28 16:17:48] ==================================================
+[2026-04-28 16:17:48] ========== ENVIRONMENT SNAPSHOT ==========
+[2026-04-28 16:17:48] ==================================================
+
+--- Environment Info ---
+[2026-04-28 16:17:49] Python interpreter: .venv\Scripts\python.exe
+[2026-04-28 16:17:49] >>> BEGIN ENVIRONMENT SNAPSHOT OUTPUT <<<
+Python 3.12.10
+uv version:
+uv 0.8.16 (2de677b0d 2025-09-09)
+
+--- Installed Packages ---
+Package                   Version
+------------------------- -----------
+altgraph                  0.17.5
+arrow                     1.4.0
+et-xmlfile                2.0.0
+numpy                     2.4.4
+openpyxl                  3.1.5
+packaging                 26.1
+pandas                    3.0.2
+pefile                    2024.8.26
+pillow                    12.2.0
+psutil                    7.2.2
+pyinstaller               6.20.0
+pyinstaller-hooks-contrib 2026.4
+pypinyin                  0.55.0
+python-dateutil           2.9.0.post0
+pywin32                   311
+pywin32-ctypes            0.2.3
+screeninfo                0.8.1
+setuptools                82.0.1
+six                       1.17.0
+ttkbootstrap              1.20.2
+tzdata                    2026.1
+
+[2026-04-28 16:17:52] <<< END ENVIRONMENT SNAPSHOT OUTPUT >>>
+
+[2026-04-28 16:17:52] ==================================================
+[2026-04-28 16:17:52] ========== INITIALIZATION TEST ==========
+[2026-04-28 16:17:52] ==================================================
+
+[2026-04-28 16:17:52] ==================================================
+[2026-04-28 16:17:52] ========== START OF INITIALIZATION TEST ==========
+[2026-04-28 16:17:52] ==================================================
+[2026-04-28 16:17:52] Running initialization test...
+[2026-04-28 16:17:52] >>> BEGIN INITIALIZATION TEST OUTPUT <<<
+--- Initialization Test ---
+  [PASS] Python version: 3.12.10
+  [PASS] Platform: Windows 10.0.19045
+  [PASS] Encoding: stdout=utf-8, fs=utf-8
+  [PASS] pandas: 3.0.2
+  [PASS] arrow: 1.4.0
+  [PASS] psutil: 7.2.2
+  [PASS] pyinstaller: 6.20.0
+  [PASS] pywin32: pywin32 311 / win32api OK
+  [PASS] screeninfo: 1 monitor(s)
+  [PASS] ttkbootstrap: ttkbootstrap 1.20.2
+  [PASS] hy127: OK
+  [PASS] Chinese output: 中文输出正常
+[RESULT] All 12 tests PASSED
+[GUI] creating test window
+[GUI] window created and centered
+[GUI] entering mainloop
+[GUI] mainloop exited
+[EXIT] initialization test exiting with code 0
+[2026-04-28 16:18:08] <<< END INITIALIZATION TEST OUTPUT >>>
+[2026-04-28 16:18:08] Initialization test PASSED
+[2026-04-28 16:18:08] Initialization test exit code: 0
+[2026-04-28 16:18:08] ==================================================
+[2026-04-28 16:18:08] ========== END OF INITIALIZATION TEST ==========
+[2026-04-28 16:18:08] ==================================================
+
+[2026-04-28 16:18:08] Project code_2838 is OK
+
+
+[2026-04-28 16:18:09] ==================================================
+[2026-04-28 16:18:09] ========== PROJECT CACHE CLEANUP ==========
+[2026-04-28 16:18:09] ==================================================
+[2026-04-28 16:18:12] Removed Python cache directory: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\src\__pycache__
+
+[2026-04-28 16:18:12] ==================================================
+[2026-04-28 16:18:12] ========== VSCODE CONFIGURATION ==========
+[2026-04-28 16:18:12] ==================================================
+[2026-04-28 16:18:13] VSCode Python interpreter and F5 launch configuration are ready.
+
+[2026-04-28 16:18:13] ==================================================
+[2026-04-28 16:18:13] ========== VSCODE EXTENSIONS ==========
+[2026-04-28 16:18:13] ==================================================
+[2026-04-28 16:18:13] >>> BEGIN VSCODE EXTENSIONS OUTPUT <<<
+[2026-04-28 16:18:13] Recommended VSCode extension: ms-python.python
+[2026-04-28 16:18:13] Recommended VSCode extension: ms-python.debugpy
+[2026-04-28 16:18:13] Recommended VSCode extension: ms-python.vscode-pylance
+[2026-04-28 16:18:13] VSCode CLI extension query/install is skipped during project re-initialization to prevent Code.exe from inheriting the launcher CMD console.
+[2026-04-28 16:18:13] Required extensions are written to .vscode/extensions.json; the base installer installs Python/debugpy, and VSCode can install recommendations if needed.
+[2026-04-28 16:18:13] <<< END VSCODE EXTENSIONS OUTPUT (exit 3) >>>
+
+[2026-04-28 16:18:14] ==================================================
+[2026-04-28 16:18:14] ========== EDITOR LAUNCH ==========
+[2026-04-28 16:18:14] ==================================================
+[2026-04-28 16:18:14] Opening VSCode...
+[2026-04-28 16:18:14] VSCode launch executable: C:\Users\Hyman\AppData\Local\Programs\Microsoft VS Code\Code.exe
+[2026-04-28 16:18:15] VSCode launch workspace: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移
+[2026-04-28 16:18:15] Initialization log file: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\init_log.txt
+[2026-04-28 16:18:15] VSCode launch arguments: "C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移"
+[2026-04-28 16:18:23] VSCode launch requested through detached wscript bridge. Initialization details are saved to: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\init_log.txt
+
+[2026-04-28 16:18:24] ==================================================
+[2026-04-28 16:18:25] ========== 关键事项结果总结 ==========
+[2026-04-28 16:18:26] ==================================================
+[2026-04-28 16:18:26] >>> BEGIN KEY PASS SUMMARY <<<
+[2026-04-28 16:18:26] 项目名称: code_2838
+[2026-04-28 16:18:26] 项目根目录: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移
+[2026-04-28 16:18:26] 日志文件: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\init_log.txt
+[2026-04-28 16:18:26] 退出码: 0
+[2026-04-28 16:18:26] pyproject 更新退出码: 0
+[2026-04-28 16:18:26] __hy127 初始化退出码: 0
+[2026-04-28 16:18:27] uv sync 退出码: 0
+[2026-04-28 16:18:27] 初始化测试退出码: 0
+[2026-04-28 16:18:27] VSCode 插件安装退出码: 3
+[2026-04-28 16:18:28] VSCode 是否已请求启动: 1
+
+[2026-04-28 16:18:28] 关键事项统计: PASS 14 / WARN 0 / FAIL 0
+[2026-04-28 16:18:29] 整体结论: 初始化关键事项全部 PASS。
+
+[2026-04-28 16:18:30] 关键事项明细:
+[2026-04-28 16:18:30] [PASS] Project identification - Folder 'code880_temp_v5.11_还原_标准_Web迁移' mapped to project 'code_2838'.
+[2026-04-28 16:18:31] [PASS] Log/console encoding - PowerShell console/output and Python IO are configured for UTF-8.
+[2026-04-28 16:18:32] [PASS] pyproject.toml update - Project name set to 'code_2838'.
+[2026-04-28 16:18:32] [PASS] Environment reset - .venv reset completed, uv.lock preserved when present, and .uv-cache is ready.
+[2026-04-28 16:18:32] [PASS] Dependency sync - uv sync completed successfully.
+[2026-04-28 16:18:32] [PASS] hy127 deployment - __hy127 copied into .venv site-packages.
+[2026-04-28 16:18:33] [PASS] Python interpreter - .venv\Scripts\python.exe exists.
+[2026-04-28 16:18:34] [PASS] Environment snapshot - Python, uv, and installed package list captured.
+[2026-04-28 16:18:34] [PASS] Initialization test - All package/import/GUI checks passed.
+[2026-04-28 16:18:34] [PASS] Project cache cleanup - Removed 1 project __pycache__ directories; .venv and .uv-cache were left untouched.
+[2026-04-28 16:18:35] [PASS] VSCode configuration - Workspace settings select .venv Python; F5 starts the selected Python file in terminal; src/main.py launch is also available.
+[2026-04-28 16:18:35] [PASS] VSCode extensions - Required extensions are listed in .vscode/extensions.json; VSCode CLI query/install was skipped to keep the launcher CMD detachable.
+[2026-04-28 16:18:35] [PASS] VSCode launch - VSCode found at 'C:\Users\Hyman\AppData\Local\Programs\Microsoft VS Code\Code.exe' and launch requested for 'C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移'.
+[2026-04-28 16:18:36] [PASS] Overall initialization - All blocking initialization steps completed successfully.
+
+[2026-04-28 16:18:36] PASS 项及说明:
+[2026-04-28 16:18:37] - Project identification: Folder 'code880_temp_v5.11_还原_标准_Web迁移' mapped to project 'code_2838'.
+[2026-04-28 16:18:37] - Log/console encoding: PowerShell console/output and Python IO are configured for UTF-8.
+[2026-04-28 16:18:37] - pyproject.toml update: Project name set to 'code_2838'.
+[2026-04-28 16:18:37] - Environment reset: .venv reset completed, uv.lock preserved when present, and .uv-cache is ready.
+[2026-04-28 16:18:37] - Dependency sync: uv sync completed successfully.
+[2026-04-28 16:18:37] - hy127 deployment: __hy127 copied into .venv site-packages.
+[2026-04-28 16:18:37] - Python interpreter: .venv\Scripts\python.exe exists.
+[2026-04-28 16:18:37] - Environment snapshot: Python, uv, and installed package list captured.
+[2026-04-28 16:18:37] - Initialization test: All package/import/GUI checks passed.
+[2026-04-28 16:18:37] - Project cache cleanup: Removed 1 project __pycache__ directories; .venv and .uv-cache were left untouched.
+[2026-04-28 16:18:37] - VSCode configuration: Workspace settings select .venv Python; F5 starts the selected Python file in terminal; src/main.py launch is also available.
+[2026-04-28 16:18:37] - VSCode extensions: Required extensions are listed in .vscode/extensions.json; VSCode CLI query/install was skipped to keep the launcher CMD detachable.
+[2026-04-28 16:18:38] - VSCode launch: VSCode found at 'C:\Users\Hyman\AppData\Local\Programs\Microsoft VS Code\Code.exe' and launch requested for 'C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移'.
+[2026-04-28 16:18:38] - Overall initialization: All blocking initialization steps completed successfully.
+
+[2026-04-28 16:18:38] WARN 项: 无
+
+[2026-04-28 16:18:38] FAIL 项: 无
+
+[2026-04-28 16:18:38] 最终退出码: 0
+[2026-04-28 16:18:38] 日志已保存: C:\Users\Hyman\OneDrive\开发项目\Python项目\code880_temp_v5.11_260421\code880_temp_v5.11_还原_标准_Web迁移\init_log.txt
+[2026-04-28 16:18:38] <<< END KEY PASS SUMMARY >>>

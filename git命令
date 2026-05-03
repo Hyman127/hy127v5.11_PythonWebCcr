@@ -1,0 +1,80 @@
+== 克隆/拉取 ==
+
+拉回项目
+git clone https://github.com/Hyman127/hy127v5.11_multi-orchestration.git
+
+例：
+git clone https://github.com/Hyman127/hy127v5.11_multi-orchestration.git
+git clone git@github.com:Hyman127/hy127v5.11_multi-orchestration.git  
+# 会在当前目录下生成 hy127v5.11_multi-orchestration 文件夹
+
+克隆到指定目录
+git clone https://github.com/Hyman127/hy127v5.11_multi-orchestration.git my-project
+# 会克隆到 my-project 文件夹
+
+
+
+# 1. status 看未跟踪的（真正的新东西）
+chcp 65001
+git config --global core.quotePath false
+git status
+
+git add .gitignore git命令 方案设计/
+git commit -m "feat: 添加模型配置文档与git手册"
+git push origin master
+
+
+# 3. 这时本地比远端多一个 commit，diff 就有输出了
+git diff master origin/master
+
+
+
+== 推送 ==
+git init
+git add .
+git commit -m "Initial commit"
+
+New-Item .gitignore
+
+先在 GitHub 上创建这个仓库
+gh repo create Hyman127/hy127v5.11_multiAiWeb --private --source=. --push
+
+
+推送到远程
+git push
+
+例：
+git push
+# 等同于 git push origin master（当前分支已关联远程）
+
+首次推送并关联远程分支
+git push -u origin master
+
+例：
+git push -u origin master
+# 将本地 master 推送到 https://github.com/Hyman127/hy127v5.11_multi-orchestration.git
+
+推送新分支到远程
+git push -u origin 分支名
+
+例：
+git push -u origin feature/multi-model
+# 首次推送 feature/multi-model 分支并关联远程
+
+
+两步操作：
+
+1. 比对差异（只看不动）
+
+
+git fetch origin
+git diff master origin/master
+fetch 拉取远程信息但不修改本地文件，diff 显示本地和远程的区别。没输出说明完全一致。
+
+2. 有差异时拉取回来
+
+git pull origin master
+这会把远程的改动合并到本地
+
+
+

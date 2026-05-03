@@ -1,0 +1,27 @@
+{
+    "python.defaultInterpreterPath":  "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.venvPath":  "${workspaceFolder}",
+    "python.terminal.activateEnvironment":  true,
+    "python.terminal.activateEnvInCurrentTerminal":  true,
+    "files.associations":  {
+                               "*.pybak":  "python"
+                           },
+    "terminal.integrated.env.windows":  {
+                                            "PYTHONIOENCODING":  "utf-8"
+                                        },
+    "code-runner.executorMap":  {
+                                    "python":  "set PYTHONIOENCODING=utf-8 \u0026\u0026 python -u"
+                                },
+    "debug.console.fontFamily":  "SimHei, SimSun, Microsoft YaHei, Consolas",
+    "debug.console.fontSize":  13,
+    "debug.console.lineHeight":  15,
+    "editor.formatOnSave":  true,
+    "customLocalFormatters.formatters":  [
+                                             {
+                                                 "command":  "set PYTHONIOENCODING=utf-8 \u0026\u0026 python .vscode/on_save.py ${file}",
+                                                 "languages":  [
+                                                                   "python"
+                                                               ]
+                                             }
+                                         ]
+}
