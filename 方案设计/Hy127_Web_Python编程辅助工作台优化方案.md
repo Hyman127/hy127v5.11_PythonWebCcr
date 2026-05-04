@@ -786,7 +786,7 @@ GET /api/git/status
 GET /api/git/diff
 -> files[], truncated, summary, hunks_preview
 
-GET /api/git/diff/{path}
+GET /api/git/diff?path=<file>
 -> path, diff, truncated
 
 GET /api/git/log
