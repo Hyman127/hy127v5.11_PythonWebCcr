@@ -97,7 +97,7 @@ def register_project(port: int, project_root: str) -> dict | None:
         data=body,
         headers={
             "Content-Type": "application/json",
-            "X-Launch-Token": launch_token,
+            "Authorization": f"Bearer {launch_token}",
         },
         method="POST",
     )
@@ -124,7 +124,7 @@ def create_bootstrap_code(port: int) -> str | None:
         data=body,
         headers={
             "Content-Type": "application/json",
-            "X-Launch-Token": launch_token,
+            "Authorization": f"Bearer {launch_token}",
         },
         method="POST",
     )

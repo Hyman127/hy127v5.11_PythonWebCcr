@@ -884,6 +884,9 @@ createApp({
     }
 
     function switchFile(f) {
+      if (activeFile.value && activeFile.value !== f && activeFile.value.viewType === 'code' && activeFile.value._dirty && monacoEditor) {
+        activeFile.value.content = monacoEditor.getValue();
+      }
       activeFile.value = f;
       if (f.viewType === 'code') nextTick(() => loadMonaco(f));
     }

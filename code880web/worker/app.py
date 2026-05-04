@@ -100,6 +100,7 @@ async def files_save(request: Request):
     base_sha256 = body.get("base_sha256")
     if not path or content is None:
         raise HTTPException(400, "缺少 path 或 content")
+    _check_protected(path)
     try:
         return file_service.save_file(path, content, base_sha256)
     except ValueError as e:

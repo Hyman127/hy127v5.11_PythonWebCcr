@@ -1,5 +1,13 @@
 ﻿
 *.exe
 *.log
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.test-tmp/
+.hy127web_global/
+state_pytest_tmp/
+pytest-cache-files-*/
 .trae/
 .lingma/

@@ -102,37 +102,54 @@ class GitService:
         full_diff = result.stdout
 
         truncated = False
+        total_bytes = 0
         files = []
         current_file = None
         current_hunks = 0
+        current_file_truncated = False
         current_lines: list[str] = []
 
+        def _flush_file():
+            nonlocal total_bytes
+            text = "\n".join(current_lines)
+            total_bytes += len(text.encode("utf-8"))
+            files.append({
+                "path": current_file,
+                "hunks_preview": text,
+                "truncated": current_file_truncated,
+            })
+
         for line in full_diff.splitlines():
-            if line.startswith("diff --git"):
-                if current_file:
+            if total_bytes > self.MAX_DIFF_BYTES:
+                truncated = True
+                if current_file and current_lines:
                     files.append({
                         "path": current_file,
                         "hunks_preview": "\n".join(current_lines),
-                        "truncated": current_hunks > self.MAX_HUNKS_PER_FILE,
+                        "truncated": True,
                     })
+                break
+
+            if line.startswith("diff --git"):
+                if current_file:
+                    _flush_file()
                 current_file = self._extract_diff_path(line)
                 current_hunks = 0
+                current_file_truncated = False
                 current_lines = [line]
+            elif current_file_truncated:
+                continue
             else:
-                current_lines.append(line)
                 if line.startswith("@@"):
                     current_hunks += 1
+                    if current_hunks > self.MAX_HUNKS_PER_FILE:
+                        current_file_truncated = True
+                        current_lines.append("... [hunks truncated]")
+                        continue
+                current_lines.append(line)
 
-        if current_file:
-            files.append({
-                "path": current_file,
-                "hunks_preview": "\n".join(current_lines),
-                "truncated": current_hunks > self.MAX_HUNKS_PER_FILE,
-            })
-
-        total_size = len(full_diff.encode("utf-8"))
-        if total_size > self.MAX_DIFF_BYTES:
-            truncated = True
+        if current_file and current_lines and total_bytes <= self.MAX_DIFF_BYTES:
+            _flush_file()
 
         return {
             "files": files,
@@ -206,11 +223,14 @@ class GitService:
         cmd = ["git", "diff", "--unified=8", "--", rel_path]
         result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True, timeout=5)
         diff_text = result.stdout
-        total_size = len(diff_text.encode("utf-8"))
+        diff_bytes = diff_text.encode("utf-8")
+        total_size = len(diff_bytes)
         truncated = total_size > self.MAX_DIFF_BYTES
+        if truncated:
+            diff_text = diff_bytes[:self.MAX_DIFF_BYTES].decode("utf-8", errors="replace")
         return {
             "path": rel_path,
-            "diff": diff_text if not truncated else diff_text[:self.MAX_DIFF_BYTES],
+            "diff": diff_text,
             "truncated": truncated,
         }
 
@@ -233,9 +253,12 @@ class GitService:
             return ""
 
     def _is_within_project(self, repo_root: str) -> bool:
-        repo_norm = os.path.normpath(repo_root)
-        proj_norm = os.path.normpath(self.project_root)
-        return repo_norm.startswith(proj_norm) or repo_norm == proj_norm
+        try:
+            from pathlib import Path
+            Path(repo_root).resolve().relative_to(Path(self.project_root).resolve())
+            return True
+        except ValueError:
+            return False
 
     @staticmethod
     def _extract_diff_path(line: str) -> str:

@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
+from .ai_runtime import DirectHttpRuntime
 from .auth import AuthManager
 from .config import HubConfig, find_available_port, get_global_dir
 from .models_manager import ModelsManager
@@ -199,45 +200,28 @@ async def ai_relay(request: Request):
     if not api_key:
         raise HTTPException(400, "API Key 未配置")
 
-    import httpx as _httpx
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    ai_body = {
-        "model": model["model_id"],
-        "messages": messages,
-        "stream": body.get("stream", True),
-    }
+    ai_runtime = DirectHttpRuntime(
+        api_base=model["api_base"],
+        api_key=api_key,
+        timeout=120,
+    )
 
-    client = _httpx.AsyncClient(timeout=120)
-    try:
-        req = client.build_request(
-            "POST",
-            f"{model['api_base'].rstrip('/')}/chat/completions",
-            json=ai_body,
-            headers=headers,
-        )
-        resp = await client.send(req, stream=True)
-    except Exception as e:
-        await client.aclose()
-        raise HTTPException(502, f"AI 服务连接失败: {e}")
+    async def _stream_sse():
+        async for chunk in ai_runtime.chat(
+            messages=messages,
+            model=model["model_id"],
+            stream=body.get("stream", True),
+        ):
+            if chunk.get("type") == "content":
+                sse_data = json.dumps({"type": "content", "data": chunk["data"]})
+                yield f"data: {sse_data}\n\n".encode("utf-8")
+            elif chunk.get("type") == "error":
+                sse_data = json.dumps({"type": "error", "data": chunk["data"]})
+                yield f"data: {sse_data}\n\n".encode("utf-8")
+        yield b"data: [DONE]\n\n"
 
     from starlette.responses import StreamingResponse as _SR
-
-    async def _stream():
-        try:
-            async for chunk in resp.aiter_bytes():
-                yield chunk
-        finally:
-            await resp.aclose()
-            await client.aclose()
-
-    return _SR(
-        _stream(),
-        status_code=resp.status_code,
-        media_type="text/event-stream",
-    )
+    return _SR(_stream_sse(), media_type="text/event-stream")
 
 
 # ── Hub APIs (session cookie required) ──
