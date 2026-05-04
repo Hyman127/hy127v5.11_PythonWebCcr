@@ -46,7 +46,7 @@
 
 ```text
 Hy127v5.11_PythonWeb/
-├── code880web/                # 当前历史包名；后续目标为 hy127web/
+├── Hy127web/                # 当前历史包名；后续目标为 hy127web/
 │   ├── hub/
 │   │   ├── app.py              # Hub 主服务入口
 │   │   ├── auth.py             # 启动 token、session、CSRF
