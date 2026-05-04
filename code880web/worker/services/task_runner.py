@@ -3,12 +3,14 @@ import json
 import os
 import signal
 import subprocess
+import sys
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 
 from .security import validate_path
+from .platform_utils import build_popen_kwargs, terminate_process
 
 
 class TaskRunner:
@@ -22,27 +24,46 @@ class TaskRunner:
         self.completed_tasks: dict[str, dict] = {}
 
     def detect_python(self) -> str:
-        venv_python = Path(self.project_root) / ".venv" / "Scripts" / "python.exe"
+        config_file = Path(self.project_root) / ".web-workbench" / "config.json"
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    python = config.get("python_path")
+                    if python and os.path.isfile(python):
+                        return python
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if sys.platform == "win32":
+            venv_python = Path(self.project_root) / ".venv" / "Scripts" / "python.exe"
+        else:
+            venv_python = Path(self.project_root) / ".venv" / "bin" / "python"
         if venv_python.exists():
             return str(venv_python)
 
-        config_file = Path(self.project_root) / ".web-workbench" / "config.json"
-        if config_file.exists():
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = json.load(f)
-                python = config.get("python_path")
-                if python and os.path.isfile(python):
-                    return python
-
-        install_file = os.path.join(
-            os.environ.get("LOCALAPPDATA", ""), "Code880Web", "install.json"
-        )
+        global_dir = os.environ.get("CODE880WEB_GLOBAL_DIR", "").strip()
+        if not global_dir:
+            global_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Code880Web")
+        install_file = os.path.join(global_dir, "install.json")
         if os.path.isfile(install_file):
-            with open(install_file, "r", encoding="utf-8") as f:
-                install = json.load(f)
-                python = install.get("python_path")
-                if python and os.path.isfile(python):
-                    return python
+            try:
+                with open(install_file, "r", encoding="utf-8") as f:
+                    install = json.load(f)
+                    python = install.get("python_path")
+                    if python and os.path.isfile(python):
+                        return python
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if os.path.isfile(sys.executable):
+            return sys.executable
+
+        import shutil
+        for name in ("python3", "python"):
+            path = shutil.which(name)
+            if path:
+                return path
 
         return "python"
 
@@ -63,14 +84,18 @@ class TaskRunner:
         python_path = self.detect_python()
 
         env = os.environ.copy()
-        venv_bin = os.path.join(self.project_root, ".venv", "Scripts")
+        if sys.platform == "win32":
+            venv_bin = os.path.join(self.project_root, ".venv", "Scripts")
+        else:
+            venv_bin = os.path.join(self.project_root, ".venv", "bin")
         if os.path.isdir(venv_bin):
-            env["PATH"] = f"{venv_bin};{env.get('PATH', '')}"
+            env["PATH"] = f"{venv_bin}{os.pathsep}{env.get('PATH', '')}"
         env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONPATH"] = self.project_root
 
         cmd_args = args or []
+        popen_kwargs = build_popen_kwargs()
         process = await asyncio.create_subprocess_exec(
             python_path, "-u", str(target), *cmd_args,
             stdin=asyncio.subprocess.PIPE,
@@ -78,7 +103,7 @@ class TaskRunner:
             stderr=asyncio.subprocess.STDOUT,
             cwd=self.project_root,
             env=env,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            **popen_kwargs,
         )
 
         runs_dir = os.path.join(self.project_root, ".web-workbench", "runs")
@@ -191,7 +216,7 @@ class TaskRunner:
             return
         process = task["process"]
         try:
-            os.kill(process.pid, signal.CTRL_BREAK_EVENT)
+            terminate_process(process)
             try:
                 await asyncio.wait_for(process.wait(), timeout=3)
             except asyncio.TimeoutError:

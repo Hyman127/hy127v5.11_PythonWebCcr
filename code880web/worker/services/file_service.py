@@ -156,6 +156,83 @@ class FileService:
         except Exception:
             pass
 
+    def create_file(self, rel_path: str) -> dict:
+        if not validate_path(self.project_root, rel_path):
+            raise ValueError("路径不合法")
+        abs_path = os.path.join(self.project_root, rel_path)
+        if os.path.exists(abs_path):
+            raise FileExistsError(f"文件已存在: {rel_path}")
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "w", encoding="utf-8") as f:
+            f.write("")
+        return {"path": rel_path, "type": "file", "created": True}
+
+    def create_dir(self, rel_path: str) -> dict:
+        if not validate_path(self.project_root, rel_path):
+            raise ValueError("路径不合法")
+        abs_path = os.path.join(self.project_root, rel_path)
+        if os.path.exists(abs_path):
+            raise FileExistsError(f"已存在: {rel_path}")
+        os.makedirs(abs_path, exist_ok=True)
+        return {"path": rel_path, "type": "directory", "created": True}
+
+    def rename(self, rel_path: str, new_name: str) -> dict:
+        if not validate_path(self.project_root, rel_path):
+            raise ValueError("路径不合法")
+        if not new_name or not new_name.strip():
+            raise ValueError("名称不能为空")
+        abs_path = os.path.join(self.project_root, rel_path)
+        if not os.path.exists(abs_path):
+            raise FileNotFoundError(f"不存在: {rel_path}")
+        parent_dir = os.path.dirname(abs_path)
+        new_abs_path = os.path.join(parent_dir, new_name)
+        new_rel_path = os.path.join(os.path.dirname(rel_path), new_name).replace("\\", "/")
+        if not validate_path(self.project_root, new_rel_path):
+            raise ValueError("新路径不合法")
+        if os.path.exists(new_abs_path):
+            raise FileExistsError(f"目标已存在: {new_name}")
+        os.rename(abs_path, new_abs_path)
+        return {"old_path": rel_path, "new_path": new_rel_path}
+
+    def delete_file(self, rel_path: str, soft: bool = True) -> dict:
+        if not validate_path(self.project_root, rel_path):
+            raise ValueError("路径不合法")
+        abs_path = os.path.join(self.project_root, rel_path)
+        if not os.path.exists(abs_path):
+            raise FileNotFoundError(f"不存在: {rel_path}")
+        is_dir = os.path.isdir(abs_path)
+        if soft and not is_dir:
+            trash_dir = os.path.join(self.project_root, ".web-workbench", "trash")
+            os.makedirs(trash_dir, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = rel_path.replace("/", "_").replace("\\", "_")
+            dest = os.path.join(trash_dir, f"{ts}_{safe_name}")
+            shutil.move(abs_path, dest)
+            return {"path": rel_path, "deleted": True, "soft": True, "trash_path": dest}
+        if is_dir:
+            shutil.rmtree(abs_path)
+        else:
+            os.remove(abs_path)
+        return {"path": rel_path, "deleted": True, "soft": False}
+
+    def copy_path(self, src_rel: str, dst_rel: str) -> dict:
+        if not validate_path(self.project_root, src_rel):
+            raise ValueError("源路径不合法")
+        if not validate_path(self.project_root, dst_rel):
+            raise ValueError("目标路径不合法")
+        src_abs = os.path.join(self.project_root, src_rel)
+        dst_abs = os.path.join(self.project_root, dst_rel)
+        if not os.path.exists(src_abs):
+            raise FileNotFoundError(f"源不存在: {src_rel}")
+        if os.path.exists(dst_abs):
+            raise FileExistsError(f"目标已存在: {dst_rel}")
+        os.makedirs(os.path.dirname(dst_abs), exist_ok=True)
+        if os.path.isdir(src_abs):
+            shutil.copytree(src_abs, dst_abs)
+        else:
+            shutil.copy2(src_abs, dst_abs)
+        return {"src": src_rel, "dst": dst_rel, "copied": True}
+
     def search_files(self, query: str, max_results: int = 50) -> list[dict]:
         results = []
         query_lower = query.lower()

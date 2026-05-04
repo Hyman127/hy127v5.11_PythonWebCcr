@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse, StreamingResponse, Response
 from .services.ai_service import AIService
 from .services.entrypoints import discover_entrypoints
 from .services.file_service import FileService
+from .services.git_service import GitService
 from .services.preview_service import PreviewService
+from .services.python_env_service import PythonEnvService
 from .services.task_runner import TaskRunner
 
 RUN_ID_RE = re.compile(r"^[a-f0-9]{8}$")
@@ -23,6 +25,8 @@ file_service: FileService | None = None
 preview_service: PreviewService | None = None
 task_runner: TaskRunner | None = None
 ai_service: AIService | None = None
+git_service: GitService | None = None
+python_env_service: PythonEnvService | None = None
 
 
 def _read_hub_base_url() -> str:
@@ -38,7 +42,7 @@ def _read_hub_base_url() -> str:
 
 
 def init_services(project_root: str):
-    global file_service, preview_service, task_runner, ai_service, PROJECT_ROOT
+    global file_service, preview_service, task_runner, ai_service, git_service, python_env_service, PROJECT_ROOT
     PROJECT_ROOT = project_root
     file_service = FileService(project_root)
     preview_service = PreviewService(project_root)
@@ -48,6 +52,8 @@ def init_services(project_root: str):
         hub_base_url=_read_hub_base_url(),
         hub_worker_token=INTERNAL_TOKEN,
     )
+    git_service = GitService(project_root)
+    python_env_service = PythonEnvService(project_root)
 
 
 # ── Token verification middleware ──
@@ -105,6 +111,173 @@ async def files_search(q: str = "", max_results: int = 50):
     if not q:
         return {"results": []}
     return {"results": file_service.search_files(q, max_results)}
+
+
+# ── File management ──
+
+PROTECTED_TOP_NAMES = {".git", ".venv", ".web-workbench", ".hy127web_global"}
+
+
+def _check_protected(rel_path: str):
+    parts = rel_path.replace("\\", "/").split("/")
+    if any(p in PROTECTED_TOP_NAMES for p in parts):
+        raise HTTPException(403, "禁止操作受保护的目录")
+
+
+@app.post("/api/files/create")
+async def files_create(request: Request):
+    body = await request.json()
+    rel_path = body.get("path")
+    if not rel_path:
+        raise HTTPException(400, "缺少 path")
+    _check_protected(rel_path)
+    try:
+        return file_service.create_file(rel_path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/files/mkdir")
+async def files_mkdir(request: Request):
+    body = await request.json()
+    rel_path = body.get("path")
+    if not rel_path:
+        raise HTTPException(400, "缺少 path")
+    _check_protected(rel_path)
+    try:
+        return file_service.create_dir(rel_path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/files/rename")
+async def files_rename(request: Request):
+    body = await request.json()
+    rel_path = body.get("path")
+    new_name = body.get("new_name")
+    if not rel_path or not new_name:
+        raise HTTPException(400, "缺少 path 或 new_name")
+    _check_protected(rel_path)
+    try:
+        return file_service.rename(rel_path, new_name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.delete("/api/files/delete")
+async def files_delete(request: Request):
+    body = await request.json()
+    rel_path = body.get("path")
+    soft = body.get("soft", True)
+    if not rel_path:
+        raise HTTPException(400, "缺少 path")
+    _check_protected(rel_path)
+    try:
+        return file_service.delete_file(rel_path, soft=soft)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.post("/api/files/copy")
+async def files_copy(request: Request):
+    body = await request.json()
+    src = body.get("src")
+    dst = body.get("dst")
+    if not src or not dst:
+        raise HTTPException(400, "缺少 src 或 dst")
+    _check_protected(src)
+    _check_protected(dst)
+    try:
+        return file_service.copy_path(src, dst)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+# ── Python environment ──
+
+@app.get("/api/python/interpreters")
+async def python_interpreters():
+    return python_env_service.list_interpreters()
+
+
+@app.post("/api/python/interpreters/select")
+async def python_select_interpreter(request: Request):
+    body = await request.json()
+    path = body.get("path")
+    if not path:
+        raise HTTPException(400, "缺少 path")
+    try:
+        return python_env_service.set_project_interpreter(path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/python/env")
+async def python_env():
+    return python_env_service.inspect_environment()
+
+
+# ── Git (read-only) ──
+
+@app.get("/api/git/available")
+async def git_available():
+    return git_service.available()
+
+
+@app.get("/api/git/status")
+async def git_status():
+    try:
+        return git_service.status()
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/git/diff")
+async def git_diff(path: str = ""):
+    try:
+        return git_service.diff(path)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/git/branch")
+async def git_branch():
+    try:
+        return git_service.branch()
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/git/log")
+async def git_log(max_count: int = 20):
+    try:
+        return git_service.log(max_count)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/git/commit-message")
+async def git_commit_message():
+    try:
+        return git_service.generate_commit_message()
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
 
 
 # ── Preview ──

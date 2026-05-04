@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Code880 Web 工作台</title>
+<title>Hy127 Web 工作台</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
 <script src="/vendor/vue.global.prod.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@3/dist/vue.global.prod.js'"></script>
 <script src="/vendor/monaco/vs/loader.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js'"></script>
@@ -171,6 +171,36 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .context-menu { position: fixed; z-index: 1000; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 0; min-width: 160px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
 .context-menu-item { padding: 4px 16px; font-size: 13px; cursor: pointer; }
 .context-menu-item:hover { background: var(--bg-active); }
+.context-menu-sep { border-top: 1px solid var(--border-color); margin: 4px 0; }
+
+/* ── Modal ── */
+.modal-overlay { position: fixed; z-index: 2000; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
+.modal-box { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; min-width: 360px; max-width: 90vw; }
+.modal-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+.modal-input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; border-radius: 4px; font-size: 14px; }
+.modal-body { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.modal-error { color: var(--error); font-size: 12px; margin-top: 6px; }
+.modal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.modal-buttons button { padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; border: none; }
+.modal-buttons button:not(.secondary):not(.danger) { background: var(--accent); color: #fff; }
+.modal-buttons button.secondary { background: var(--bg-hover); color: var(--text-primary); }
+.modal-buttons button.danger { background: var(--error); color: #fff; }
+
+/* ── Tab dirty indicator ── */
+.tab .dirty-dot { color: var(--warning); font-weight: bold; margin-left: 2px; }
+
+/* ── Git panel ── */
+.git-panel { padding: 12px; font-size: 13px; }
+.git-panel .section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 12px 0 6px; text-transform: uppercase; }
+.git-panel .git-file { padding: 2px 8px; cursor: pointer; border-radius: 3px; display: flex; align-items: center; gap: 6px; }
+.git-panel .git-file:hover { background: var(--bg-hover); }
+.git-panel .git-tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+.git-panel .git-tag.modified { background: #cca70033; color: var(--warning); }
+.git-panel .git-tag.added { background: #4ec9b033; color: var(--success); }
+.git-panel .git-tag.deleted { background: #f4474733; color: var(--error); }
+.git-panel .git-branch { color: var(--success); font-weight: 600; }
+.git-panel .git-empty { color: var(--text-secondary); font-size: 12px; padding: 8px; }
+.git-panel .git-diff-pre { background: var(--bg-primary); padding: 8px; border-radius: 4px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 11px; line-height: 1.4; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
 </style>
 </head>
 <body>
@@ -223,11 +253,15 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         <div class="editor-toolbar">
           <div class="tab" v-for="f in openFiles" :key="f.path"
                :class="{active: activeFile?.path === f.path}"
-               @click="switchFile(f)">
+               @click="switchFile(f)" :title="f._dirty ? '未保存' : ''">
             {{ f.name }}
+            <span class="dirty-dot" v-if="f._dirty" title="未保存变更">●</span>
             <span style="margin-left:4px;font-size:10px;color:var(--text-secondary)" @click.stop="closeFile(f)">✕</span>
           </div>
           <span class="spacer" style="flex:1"></span>
+          <span style="font-size:11px;color:var(--text-secondary);margin-right:4px" v-if="savingFile">保存中...</span>
+          <span style="font-size:11px;color:var(--error);margin-right:4px;cursor:pointer" v-if="saveError" @click="saveError=''">{{ saveError }}</span>
+          <button style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:2px 6px" @click="toggleGitPanel" :title="'Git 面板'">&#59212;</button>
           <template v-if="activeFile?.extension === '.py'">
             <select class="run-select" v-model="selectedEntrypoint">
               <option value="">当前文件</option>
@@ -313,6 +347,39 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             <input v-model="stdinInput" @keyup.enter="sendStdin" placeholder="输入内容..." />
             <button @click="sendStdin">发送</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Git Panel -->
+      <div class="terminal-panel" v-if="showGitPanel" style="height: 250px;">
+        <div class="terminal-header">
+          <span :class="{tab: true, active: true}">&#59212; Git</span>
+          <span class="git-branch" v-if="gitAvailable?.branch" style="margin-left:8px">{{ gitAvailable.branch }}</span>
+          <span class="spacer"></span>
+          <span style="font-size:11px;color:var(--text-secondary)" v-if="gitLoading">加载中...</span>
+          <button @click="showGitPanel = false">关闭</button>
+        </div>
+        <div class="git-panel" style="flex:1;overflow-y:auto" v-if="gitAvailable">
+          <div v-if="!gitAvailable.git_installed" class="git-empty">未检测到 Git，请安装 Git 后重试。</div>
+          <div v-else-if="!gitAvailable.is_repo" class="git-empty">当前项目不是 Git 仓库。</div>
+          <template v-else-if="gitStatus">
+            <div class="section-title">分支: <span class="git-branch">{{ gitStatus.branch }}</span></div>
+            <div v-if="gitStatus.staged?.length || gitStatus.unstaged?.length || gitStatus.untracked?.length">
+              <div class="section-title">变更文件</div>
+              <div class="git-file" v-for="f in gitStatus.staged" :key="f">
+                <span class="git-tag modified">暂存</span> {{ f }}
+              </div>
+              <div class="git-file" v-for="f in gitStatus.unstaged" :key="f">
+                <span class="git-tag modified">修改</span> {{ f }}
+              </div>
+              <div class="git-file" v-for="f in gitStatus.untracked" :key="f">
+                <span class="git-tag added">新增</span> {{ f }}
+              </div>
+            </div>
+            <div v-if="!gitStatus.staged?.length && !gitStatus.unstaged?.length && !gitStatus.untracked?.length" class="git-empty">工作区干净</div>
+            <div v-if="gitCommitDraft" class="section-title" style="margin-top:12px">AI 建议提交说明</div>
+            <div class="git-diff-pre" v-if="gitCommitDraft">{{ gitCommitDraft }}</div>
+          </template>
         </div>
       </div>
 
@@ -466,7 +533,39 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <!-- Context menu -->
   <div class="context-menu" v-if="contextMenu.show" :style="{left: contextMenu.x+'px', top: contextMenu.y+'px'}">
     <div class="context-menu-item" v-if="contextMenu.node?.extension === '.py'" @click="runContextFile">&#9654; 运行此文件</div>
-    <div class="context-menu-item" @click="copyPath">复制路径</div>
+    <div class="context-menu-sep" v-if="contextMenu.node?.extension === '.py'"></div>
+    <div class="context-menu-item" v-if="contextMenu.node?.type === 'directory'" @click="showNewFileDialog">&#128196; 新建文件</div>
+    <div class="context-menu-item" v-if="contextMenu.node?.type === 'directory'" @click="showNewFolderDialog">&#128193; 新建文件夹</div>
+    <div class="context-menu-item" @click="showRenameDialog">&#9998; 重命名</div>
+    <div class="context-menu-item" @click="confirmDelete">&#128465; 删除</div>
+    <div class="context-menu-sep"></div>
+    <div class="context-menu-item" @click="copyPath('relative')">复制相对路径</div>
+    <div class="context-menu-item" @click="copyPath('absolute')">复制绝对路径</div>
+  </div>
+
+  <!-- File dialog modal -->
+  <div class="modal-overlay" v-if="fileDialog.show" @click.self="fileDialog.show = false">
+    <div class="modal-box">
+      <div class="modal-title">{{ fileDialog.title }}</div>
+      <input class="modal-input" v-model="fileDialog.value" @keydown.enter="confirmFileDialog" @keydown.esc="fileDialog.show = false" autofocus />
+      <div class="modal-error" v-if="fileDialog.error">{{ fileDialog.error }}</div>
+      <div class="modal-buttons">
+        <button class="secondary" @click="fileDialog.show = false">取消</button>
+        <button @click="confirmFileDialog">{{ fileDialog.confirmLabel || '确定' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div class="modal-overlay" v-if="deleteConfirm.show" @click.self="deleteConfirm.show = false">
+    <div class="modal-box">
+      <div class="modal-title">{{ deleteConfirm.title }}</div>
+      <div class="modal-body">{{ deleteConfirm.message }}</div>
+      <div class="modal-buttons">
+        <button class="secondary" @click="deleteConfirm.show = false">取消</button>
+        <button class="danger" @click="doDelete">确认删除</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -584,7 +683,25 @@ createApp({
 
     // Monaco
     let monacoEditor = null;
+    let monacoDirtyListener = null;
     const activeSheetIdx = ref(0);
+    const savingFile = ref(false);
+    const saveError = ref('');
+    const MAX_EDITABLE_SIZE = 2 * 1024 * 1024;
+
+    // File dialogs
+    const fileDialog = reactive({ show: false, title: '', value: '', error: '', confirmLabel: '', node: null, mode: '' });
+    const deleteConfirm = reactive({ show: false, title: '', message: '', node: null });
+
+    // Git panel
+    const showGitPanel = ref(false);
+    const gitAvailable = ref(null);
+    const gitStatus = ref(null);
+    const gitDiff = ref(null);
+    const gitBranch = ref(null);
+    const gitLog = ref(null);
+    const gitCommitDraft = ref('');
+    const gitLoading = ref(false);
 
     const currentSheet = computed(() => {
       if (!activeFile.value?.previewData?.sheets) return null;
@@ -667,6 +784,12 @@ createApp({
       if ((e.key === 'F5' || (e.ctrlKey && e.key === 'F5')) && activeFile.value?.extension === '.py') {
         e.preventDefault();
         if (isRunning.value) stopRun(); else runFile();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (activeFile.value?.viewType === 'code' && activeFile.value._dirty) {
+          saveActiveFile();
+        }
       }
     }
 
@@ -766,6 +889,7 @@ createApp({
     }
 
     function closeFile(f) {
+      if (f._dirty && !confirm(`文件 "${f.name}" 有未保存的更改，确定要关闭吗？`)) return;
       const idx = openFiles.value.indexOf(f);
       openFiles.value.splice(idx, 1);
       if (activeFile.value === f) {
@@ -792,12 +916,14 @@ createApp({
 
       const langMap = {'.py':'python','.js':'javascript','.ts':'typescript','.json':'json','.html':'html','.css':'css','.md':'markdown','.yaml':'yaml','.yml':'yaml','.toml':'ini','.xml':'xml','.bat':'bat','.ps1':'powershell','.sh':'shell','.sql':'sql','.csv':'plaintext','.log':'plaintext','.txt':'plaintext'};
       const lang = langMap[file.extension] || 'plaintext';
+      const largeFile = (file.size || 0) > MAX_EDITABLE_SIZE;
+      const readOnly = largeFile || !file.editable;
 
       monacoEditor = window.monaco.editor.create(container, {
         value: file.content || '',
         language: lang,
         theme: 'vs-dark',
-        readOnly: true,
+        readOnly: readOnly,
         minimap: { enabled: true },
         fontSize: 14,
         lineNumbers: 'on',
@@ -805,6 +931,212 @@ createApp({
         automaticLayout: true,
         wordWrap: 'on',
       });
+
+      file._base_sha256 = file.sha256;
+      file._dirty = false;
+
+      if (!readOnly && !largeFile) {
+        if (monacoDirtyListener) monacoDirtyListener.dispose();
+        monacoDirtyListener = monacoEditor.onDidChangeModelContent(() => {
+          markDirty(file);
+        });
+      }
+    }
+
+    function markDirty(file) {
+      file._dirty = true;
+    }
+
+    async function saveActiveFile() {
+      const file = activeFile.value;
+      if (!file || file.viewType !== 'code') return;
+      if (!file._dirty) return;
+
+      const content = monacoEditor ? monacoEditor.getValue() : file.content;
+      savingFile.value = true;
+      saveError.value = '';
+
+      try {
+        const resp = await apiFetch(`${wsBase.value}/files/save`, {
+          method: 'POST',
+          body: JSON.stringify({
+            path: file.path,
+            content: content,
+            base_sha256: file._base_sha256,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          if (resp.status === 409) {
+            saveError.value = '文件已被外部修改，请刷新文件后重新编辑。';
+            alert('保存冲突: 文件已被外部进程修改。请关闭文件后重新打开。');
+          } else {
+            saveError.value = data.detail || '保存失败';
+          }
+          return;
+        }
+        file.sha256 = data.sha256;
+        file._base_sha256 = data.sha256;
+        file.content = content;
+        file._dirty = false;
+        saveError.value = '';
+      } catch(e) {
+        saveError.value = `保存失败: ${e}`;
+      } finally {
+        savingFile.value = false;
+      }
+    }
+
+    // ── File management ──
+
+    function showNewFileDialog() {
+      fileDialog.show = true;
+      fileDialog.title = '新建文件';
+      fileDialog.value = '';
+      fileDialog.error = '';
+      fileDialog.confirmLabel = '创建';
+      fileDialog.mode = 'new_file';
+      fileDialog.node = contextMenu.node;
+      contextMenu.show = false;
+    }
+
+    function showNewFolderDialog() {
+      fileDialog.show = true;
+      fileDialog.title = '新建文件夹';
+      fileDialog.value = '';
+      fileDialog.error = '';
+      fileDialog.confirmLabel = '创建';
+      fileDialog.mode = 'new_folder';
+      fileDialog.node = contextMenu.node;
+      contextMenu.show = false;
+    }
+
+    function showRenameDialog() {
+      fileDialog.show = true;
+      fileDialog.title = '重命名';
+      fileDialog.value = contextMenu.node?.name || '';
+      fileDialog.error = '';
+      fileDialog.confirmLabel = '重命名';
+      fileDialog.mode = 'rename';
+      fileDialog.node = contextMenu.node;
+      contextMenu.show = false;
+    }
+
+    async function confirmFileDialog() {
+      const name = fileDialog.value.trim();
+      if (!name) { fileDialog.error = '名称不能为空'; return; }
+      fileDialog.error = '';
+
+      try {
+        let resp;
+        if (fileDialog.mode === 'new_file') {
+          const parentPath = fileDialog.node?.path || '';
+          const fullPath = parentPath ? `${parentPath}/${name}` : name;
+          resp = await apiFetch(`${wsBase.value}/files/create`, {
+            method: 'POST', body: JSON.stringify({ path: fullPath }),
+          });
+        } else if (fileDialog.mode === 'new_folder') {
+          const parentPath = fileDialog.node?.path || '';
+          const fullPath = parentPath ? `${parentPath}/${name}` : name;
+          resp = await apiFetch(`${wsBase.value}/files/mkdir`, {
+            method: 'POST', body: JSON.stringify({ path: fullPath }),
+          });
+        } else if (fileDialog.mode === 'rename') {
+          resp = await apiFetch(`${wsBase.value}/files/rename`, {
+            method: 'POST', body: JSON.stringify({ path: fileDialog.node.path, new_name: name }),
+          });
+        }
+        if (resp && !resp.ok) {
+          const d = await resp.json();
+          fileDialog.error = d.detail || '操作失败';
+          return;
+        }
+        fileDialog.show = false;
+        reloadFileTree();
+      } catch(e) {
+        fileDialog.error = `操作失败: ${e}`;
+      }
+    }
+
+    function confirmDelete() {
+      const node = contextMenu.node;
+      if (!node) return;
+      contextMenu.show = false;
+      deleteConfirm.show = true;
+      deleteConfirm.node = node;
+      const isDir = node.type === 'directory';
+      deleteConfirm.title = isDir ? '删除文件夹' : '删除文件';
+      deleteConfirm.message = isDir
+        ? `确定要永久删除文件夹 "${node.name}" 吗？此操作不可撤销。`
+        : `确定要删除文件 "${node.name}" 吗？文件将移到回收站。`;
+    }
+
+    async function doDelete() {
+      const node = deleteConfirm.node;
+      if (!node) return;
+      const isDir = node.type === 'directory';
+      deleteConfirm.show = false;
+      try {
+        const resp = await apiFetch(`${wsBase.value}/files/delete`, {
+          method: 'DELETE',
+          body: JSON.stringify({ path: node.path, soft: !isDir }),
+        });
+        if (!resp.ok) {
+          const d = await resp.json();
+          alert(`删除失败: ${d.detail || '未知错误'}`);
+          return;
+        }
+        const idx = openFiles.value.findIndex(f => f.path === node.path);
+        if (idx >= 0) closeFile(openFiles.value[idx]);
+        reloadFileTree();
+      } catch(e) {
+        alert(`删除失败: ${e}`);
+      }
+    }
+
+    async function reloadFileTree() {
+      try {
+        const resp = await apiFetch(`${wsBase.value}/files/tree`);
+        const data = await resp.json();
+        fileTree.value = markReactive(data.tree || []);
+      } catch(e) { console.error(e); }
+    }
+
+    // ── Git panel ──
+
+    async function loadGitPanel() {
+      gitLoading.value = true;
+      try {
+        const [availResp, statusResp] = await Promise.all([
+          apiFetch(`${wsBase.value}/git/available`),
+          apiFetch(`${wsBase.value}/git/status`),
+        ]);
+        gitAvailable.value = await availResp.json();
+        gitStatus.value = await statusResp.json();
+
+        if (gitAvailable.value.is_repo) {
+          const [diffResp, branchResp, logResp, cmResp] = await Promise.all([
+            apiFetch(`${wsBase.value}/git/diff`),
+            apiFetch(`${wsBase.value}/git/branch`),
+            apiFetch(`${wsBase.value}/git/log?max_count=10`),
+            apiFetch(`${wsBase.value}/git/commit-message`),
+          ]);
+          gitDiff.value = await diffResp.json();
+          gitBranch.value = await branchResp.json();
+          gitLog.value = await logResp.json();
+          const cmData = await cmResp.json();
+          gitCommitDraft.value = cmData.draft || '';
+        }
+      } catch(e) {
+        gitAvailable.value = { git_installed: false, is_repo: false, error: String(e) };
+      } finally {
+        gitLoading.value = false;
+      }
+    }
+
+    function toggleGitPanel() {
+      showGitPanel.value = !showGitPanel.value;
+      if (showGitPanel.value) loadGitPanel();
     }
 
     // ── Run ──
@@ -1199,9 +1531,15 @@ createApp({
       }
     }
 
-    function copyPath() {
+    function copyPath(type = 'relative') {
       contextMenu.show = false;
-      if (contextMenu.node) navigator.clipboard.writeText(contextMenu.node.path);
+      if (!contextMenu.node) return;
+      if (type === 'absolute') {
+        const abs = `${projectName.value ? 'project/' + projectName.value + '/' : ''}${contextMenu.node.path}`;
+        navigator.clipboard.writeText(abs);
+      } else {
+        navigator.clipboard.writeText(contextMenu.node.path);
+      }
     }
 
     function getPreviewUrl(path) {
@@ -1217,6 +1555,8 @@ createApp({
       models, runtimes, currentProfileKey, thinkingProfile,
       apiProfiles, cliProfiles, currentProfileHint,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
+      savingFile, saveError, fileDialog, deleteConfirm,
+      showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,
       openProject, goHome, loadWorkspace, onFileSelect, onDirToggle,
       switchFile, closeFile, runFile, stopRun, sendStdin, clearTerminal,
       sendChat, clearChat, startNewConversation, toggleAI, toggleModelSettings, applyProviderPreset,
@@ -1224,6 +1564,9 @@ createApp({
       providerName, runtimeState, updateContext, renderMd,
       onFileContextMenu, runContextFile, copyPath, getPreviewUrl,
       addTerminalLine,
+      saveActiveFile, markDirty,
+      showNewFileDialog, showNewFolderDialog, showRenameDialog, confirmFileDialog, confirmDelete, doDelete,
+      toggleGitPanel, loadGitPanel,
     };
   }
 }).component('TreeNode', TreeNode).mount('#app');

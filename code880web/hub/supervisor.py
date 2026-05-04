@@ -5,6 +5,7 @@ import shutil
 import socket
 import stat
 import subprocess
+import sys
 from dataclasses import dataclass, field
 
 from .config import HubConfig, read_install_info
@@ -76,7 +77,12 @@ class WorkerSupervisor:
         self._rotate_log(log_path)
         log_file = open(log_path, "a", encoding="utf-8")
 
-        creation_flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+        if sys.platform == "win32":
+            popen_kwargs = {
+                "creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP,
+            }
+        else:
+            popen_kwargs = {"start_new_session": True}
 
         env = os.environ.copy()
         env["CODE880_WORKER_TOKEN_FILE"] = token_file
@@ -90,8 +96,8 @@ class WorkerSupervisor:
             cwd=install_root,
             stdout=log_file,
             stderr=subprocess.STDOUT,
-            creationflags=creation_flags,
             env=env,
+            **popen_kwargs,
         )
 
         info = WorkerInfo(
