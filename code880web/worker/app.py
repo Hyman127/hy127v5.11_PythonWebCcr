@@ -100,7 +100,6 @@ async def files_save(request: Request):
     base_sha256 = body.get("base_sha256")
     if not path or content is None:
         raise HTTPException(400, "缺少 path 或 content")
-    _check_protected(path)
     try:
         return file_service.save_file(path, content, base_sha256)
     except ValueError as e:
@@ -116,13 +115,7 @@ async def files_search(q: str = "", max_results: int = 50):
 
 # ── File management ──
 
-PROTECTED_TOP_NAMES = {".git", ".venv", ".web-workbench", ".hy127web_global"}
-
-
-def _check_protected(rel_path: str):
-    parts = rel_path.replace("\\", "/").split("/")
-    if any(p in PROTECTED_TOP_NAMES for p in parts):
-        raise HTTPException(403, "禁止操作受保护的目录")
+# PROTECTED_TOP_NAMES enforcement moved into FileService layer
 
 
 @app.post("/api/files/create")
@@ -131,7 +124,6 @@ async def files_create(request: Request):
     rel_path = body.get("path")
     if not rel_path:
         raise HTTPException(400, "缺少 path")
-    _check_protected(rel_path)
     try:
         return file_service.create_file(rel_path)
     except ValueError as e:
@@ -146,7 +138,6 @@ async def files_mkdir(request: Request):
     rel_path = body.get("path")
     if not rel_path:
         raise HTTPException(400, "缺少 path")
-    _check_protected(rel_path)
     try:
         return file_service.create_dir(rel_path)
     except ValueError as e:
@@ -162,7 +153,6 @@ async def files_rename(request: Request):
     new_name = body.get("new_name")
     if not rel_path or not new_name:
         raise HTTPException(400, "缺少 path 或 new_name")
-    _check_protected(rel_path)
     try:
         return file_service.rename(rel_path, new_name)
     except ValueError as e:
@@ -180,7 +170,6 @@ async def files_delete(request: Request):
     soft = body.get("soft", True)
     if not rel_path:
         raise HTTPException(400, "缺少 path")
-    _check_protected(rel_path)
     try:
         return file_service.delete_file(rel_path, soft=soft)
     except ValueError as e:
@@ -196,8 +185,6 @@ async def files_copy(request: Request):
     dst = body.get("dst")
     if not src or not dst:
         raise HTTPException(400, "缺少 src 或 dst")
-    _check_protected(src)
-    _check_protected(dst)
     try:
         return file_service.copy_path(src, dst)
     except ValueError as e:

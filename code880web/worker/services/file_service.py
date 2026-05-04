@@ -25,9 +25,17 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".ico", ".w
 PREVIEW_EXTENSIONS = {".pdf", ".xlsx", ".docx", ".pptx"}
 
 
+PROTECTED_TOP_NAMES = {".git", ".venv", ".web-workbench", ".hy127web_global"}
+
+
 class FileService:
     def __init__(self, project_root: str):
         self.project_root = project_root
+
+    def _check_protected(self, rel_path: str):
+        parts = rel_path.replace("\\", "/").split("/")
+        if any(p in PROTECTED_TOP_NAMES for p in parts):
+            raise ValueError("禁止操作受保护的目录")
 
     def get_tree(self, rel_dir: str = "", depth: int = 3) -> list[dict]:
         if rel_dir and not validate_path(self.project_root, rel_dir):
@@ -125,6 +133,7 @@ class FileService:
     def save_file(self, rel_path: str, content: str, base_sha256: str | None = None) -> dict:
         if not validate_path(self.project_root, rel_path):
             raise ValueError("路径不合法")
+        self._check_protected(rel_path)
 
         abs_path = os.path.join(self.project_root, rel_path)
 
@@ -159,6 +168,7 @@ class FileService:
     def create_file(self, rel_path: str) -> dict:
         if not validate_path(self.project_root, rel_path):
             raise ValueError("路径不合法")
+        self._check_protected(rel_path)
         abs_path = os.path.join(self.project_root, rel_path)
         if os.path.exists(abs_path):
             raise FileExistsError(f"文件已存在: {rel_path}")
@@ -170,6 +180,7 @@ class FileService:
     def create_dir(self, rel_path: str) -> dict:
         if not validate_path(self.project_root, rel_path):
             raise ValueError("路径不合法")
+        self._check_protected(rel_path)
         abs_path = os.path.join(self.project_root, rel_path)
         if os.path.exists(abs_path):
             raise FileExistsError(f"已存在: {rel_path}")
@@ -179,6 +190,7 @@ class FileService:
     def rename(self, rel_path: str, new_name: str) -> dict:
         if not validate_path(self.project_root, rel_path):
             raise ValueError("路径不合法")
+        self._check_protected(rel_path)
         if not new_name or not new_name.strip():
             raise ValueError("名称不能为空")
         abs_path = os.path.join(self.project_root, rel_path)
@@ -197,6 +209,7 @@ class FileService:
     def delete_file(self, rel_path: str, soft: bool = True) -> dict:
         if not validate_path(self.project_root, rel_path):
             raise ValueError("路径不合法")
+        self._check_protected(rel_path)
         abs_path = os.path.join(self.project_root, rel_path)
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f"不存在: {rel_path}")
@@ -220,6 +233,8 @@ class FileService:
             raise ValueError("源路径不合法")
         if not validate_path(self.project_root, dst_rel):
             raise ValueError("目标路径不合法")
+        self._check_protected(src_rel)
+        self._check_protected(dst_rel)
         src_abs = os.path.join(self.project_root, src_rel)
         dst_abs = os.path.join(self.project_root, dst_rel)
         if not os.path.exists(src_abs):

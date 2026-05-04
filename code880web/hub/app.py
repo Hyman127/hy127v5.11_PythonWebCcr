@@ -452,7 +452,8 @@ if os.path.isdir(static_dir):
 def main():
     import uvicorn
 
-    env_port = os.environ.get("CODE880WEB_HUB_PORT", "").strip()
+    env_port = os.environ.get("HY127WEB_HUB_PORT", "") or os.environ.get("CODE880WEB_HUB_PORT", "")
+    env_port = env_port.strip()
     if env_port and env_port.isdigit():
         port = int(env_port)
     else:

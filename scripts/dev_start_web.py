@@ -148,6 +148,7 @@ def main():
     port = args.port or find_free_port(HUB_PORT)
     print(f"[Hy127 Web Dev] Starting on port {port}")
 
+    os.environ["HY127WEB_HUB_PORT"] = str(port)
     os.environ["CODE880WEB_HUB_PORT"] = str(port)
 
     hub_proc = start_hub()

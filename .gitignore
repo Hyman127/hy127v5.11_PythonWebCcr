@@ -6,6 +6,7 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .test-tmp/
+.web-workbench/
 .hy127web_global/
 state_pytest_tmp/
 pytest-cache-files-*/
