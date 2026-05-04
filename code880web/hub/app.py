@@ -452,7 +452,11 @@ if os.path.isdir(static_dir):
 def main():
     import uvicorn
 
-    port = find_available_port()
+    env_port = os.environ.get("CODE880WEB_HUB_PORT", "").strip()
+    if env_port and env_port.isdigit():
+        port = int(env_port)
+    else:
+        port = find_available_port()
     hub_config.port = port
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
 

@@ -97,9 +97,7 @@ class GitService:
         result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True, timeout=5)
         summary = result.stdout.strip()
 
-        cmd = ["git", "diff", "--unified=8"]
-        result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True, timeout=5)
-        full_diff = result.stdout
+        full_diff = self._run_git_diff(["--unified=8"])
 
         truncated = False
         total_bytes = 0
@@ -219,10 +217,25 @@ class GitService:
         draft = "\n".join(draft_lines)
         return {"draft": draft, "files": changed_files, "stat": stat}
 
+    def _run_git_diff(self, extra_args: list[str]) -> str:
+        cmd = ["git", "diff"] + extra_args
+        proc = subprocess.Popen(
+            cmd, cwd=self.project_root,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=False,
+        )
+        try:
+            stdout, _ = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, _ = proc.communicate()
+        read_limit = self.MAX_DIFF_BYTES * 2
+        if len(stdout) > read_limit:
+            stdout = stdout[:read_limit]
+        return stdout.decode("utf-8", errors="replace")
+
     def _diff_single(self, rel_path: str) -> dict:
-        cmd = ["git", "diff", "--unified=8", "--", rel_path]
-        result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True, timeout=5)
-        diff_text = result.stdout
+        diff_text = self._run_git_diff(["--unified=8", "--", rel_path])
         diff_bytes = diff_text.encode("utf-8")
         total_size = len(diff_bytes)
         truncated = total_size > self.MAX_DIFF_BYTES

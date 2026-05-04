@@ -876,7 +876,7 @@ createApp({
       } else {
         const resp = await apiFetch(`${wsBase.value}/files/content?path=${encodeURIComponent(node.path)}`);
         const data = await resp.json();
-        const file = { ...node, viewType: 'code', content: data.content, sha256: data.sha256 };
+        const file = { ...node, viewType: 'code', content: data.content, sha256: data.sha256, _base_sha256: data.sha256, _dirty: false };
         openFiles.value.push(file);
         activeFile.value = file;
         await loadMonaco(file);
@@ -935,8 +935,8 @@ createApp({
         wordWrap: 'on',
       });
 
-      file._base_sha256 = file.sha256;
-      file._dirty = false;
+      if (file._base_sha256 === undefined) file._base_sha256 = file.sha256;
+      if (file._dirty === undefined) file._dirty = false;
 
       if (!readOnly && !largeFile) {
         if (monacoDirtyListener) monacoDirtyListener.dispose();
