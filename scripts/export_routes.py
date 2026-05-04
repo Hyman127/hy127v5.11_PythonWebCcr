@@ -67,7 +67,12 @@ def main():
     args = parser.parse_args()
 
     # Import apps (module-level side-effects are safe since we're just introspecting routes)
-    from code880web.hub.app import app as hub_app
+    try:
+        from code880web.hub.app import app as hub_app
+    except ImportError as e:
+        print(f"Error importing Hub: {e}", file=sys.stderr)
+        print("Make sure fastapi and project dependencies are installed.", file=sys.stderr)
+        sys.exit(1)
     from code880web.worker.app import app as worker_app
 
     hub_routes = collect_routes(hub_app, "Hub")

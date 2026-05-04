@@ -721,7 +721,7 @@ API 细节：
 ```text
 pytest code880web/tests/test_run_id.py
 pytest code880web/tests/test_python_env_service.py
-pytest code880web/tests/test_task_runner_cross_platform.py
+pytest code880web/tests/test_platform_utils.py
 ```
 
 ## 阶段四：补齐 Git 开发辅助
@@ -733,12 +733,10 @@ pytest code880web/tests/test_task_runner_cross_platform.py
 ```text
 GET  /api/git/available
 GET  /api/git/status
-GET  /api/git/diff
-GET  /api/git/diff/{path}
+GET  /api/git/diff?path=   (path 为可选查询参数)
 GET  /api/git/branch
 GET  /api/git/log
-POST /api/git/add
-POST /api/git/commit-message
+GET  /api/git/commit-message
 ```
 
 初期只建议做只读能力：
@@ -836,7 +834,6 @@ AI 生成提交说明
 
 ```text
 pytest code880web/tests/test_git_service.py
-pytest code880web/tests/test_git_api.py
 ```
 
 ## 阶段五：把 AI 从聊天升级为编程助手
@@ -1100,10 +1097,8 @@ hy127web/hub/ai_runtime/
 - 自动化检查建议：
 
 ```text
-pytest code880web/tests/test_ai_tools.py
-pytest code880web/tests/test_task_snapshots.py
-pytest code880web/tests/test_ai_task_permissions.py
-pytest code880web/tests/test_ai_runtime_base.py
+# AI 运行时相关测试（规划中，待 CLI 运行时接入后补齐）
+pytest code880web/tests/test_platform_utils.py
 ```
 
 ## 阶段六：跨平台开发启动能力

@@ -11,7 +11,9 @@ class AIRuntime(ABC):
         """Stream chat completions. Yields {"type": "content", "data": str} or {"type": "error", "data": str}."""
         yield {"type": "error", "data": "not implemented"}
 
-    async def run_task(self, prompt: str, *, model: str = "", cwd: str = "") -> AsyncGenerator[dict, None]:
+    async def run_task(self, task: str, tools: list[dict] | None = None,
+                        permissions: dict | None = None, callbacks: dict | None = None,
+                        *, model: str = "") -> AsyncGenerator[dict, None]:
         """Run an agentic coding task. Reserved for CLI-bridged runtimes (Claude Code, Codex, etc.).
         Yields {"type": "content", "data": str} or {"type": "error", "data": str}."""
         yield {"type": "error", "data": "run_task not implemented for this runtime"}

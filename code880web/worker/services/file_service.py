@@ -34,7 +34,9 @@ class FileService:
 
     def _check_protected(self, rel_path: str):
         parts = rel_path.replace("\\", "/").split("/")
-        if any(p in PROTECTED_TOP_NAMES for p in parts):
+        lower_parts = {p.lower() for p in parts}
+        protected_lower = {n.lower() for n in PROTECTED_TOP_NAMES}
+        if lower_parts & protected_lower:
             raise ValueError("禁止操作受保护的目录")
 
     def get_tree(self, rel_dir: str = "", depth: int = 3) -> list[dict]:
