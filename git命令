@@ -1,15 +1,15 @@
 == 克隆/拉取 ==
 
 拉回项目
-git clone https://github.com/Hyman127/hy127v5.11_multi-orchestration.git
+git clone https://github.com/Hyman127/hy127v5.11_PythonWeb.git
 
 例：
-git clone https://github.com/Hyman127/hy127v5.11_multi-orchestration.git
-git clone git@github.com:Hyman127/hy127v5.11_multi-orchestration.git  
-# 会在当前目录下生成 hy127v5.11_multi-orchestration 文件夹
+git clone https://github.com/Hyman127/hy127v5.11_PythonWeb.git
+git clone git@github.com:Hyman127/hy127v5.11_PythonWeb.git  
+# 会在当前目录下生成 hy127v5.11_PythonWeb 文件夹
 
 克隆到指定目录
-git clone https://github.com/Hyman127/hy127v5.11_multi-orchestration.git my-project
+git clone https://github.com/Hyman127/hy127v5.11_PythonWeb.git my-project
 # 会克隆到 my-project 文件夹
 
 
@@ -37,7 +37,23 @@ git commit -m "Initial commit"
 New-Item .gitignore
 
 先在 GitHub 上创建这个仓库
-gh repo create Hyman127/hy127v5.11_multiAiWeb --private --source=. --push
+git init
+
+@'
+.venv/
+.venv_old/
+__pycache__/
+*.pyc
+*.exe
+*.log
+.trae/
+.lingma/
+'@ | Out-File -Encoding utf8 .gitignore
+
+git add .
+git commit -m "Initial commit"
+
+gh repo create Hyman127/hy127v5.11_PythonWeb --private --source=. --push
 
 
 推送到远程
@@ -52,7 +68,7 @@ git push -u origin master
 
 例：
 git push -u origin master
-# 将本地 master 推送到 https://github.com/Hyman127/hy127v5.11_multi-orchestration.git
+# 将本地 master 推送到 https://github.com/Hyman127/hy127v5.11_PythonWeb.git
 
 推送新分支到远程
 git push -u origin 分支名
