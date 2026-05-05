@@ -416,7 +416,9 @@ async def workspace_api_proxy(workspace_id: str, path: str, request: Request):
 async def workspace_ws_proxy(ws: WebSocket, workspace_id: str, path: str):
     await proxy_ws_to_worker(
         ws, workspace_id, path, supervisor,
-        auth.verify_session, allowed_origin=auth._allowed_origin,
+        auth.verify_session,
+        allowed_origin=auth._allowed_origin,
+        session_cookie_names=auth.SESSION_COOKIE_NAMES,
     )
 
 

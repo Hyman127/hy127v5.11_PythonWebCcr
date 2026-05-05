@@ -1,8 +1,6 @@
 import asyncio
 import json
 import os
-import signal
-import subprocess
 import sys
 import time
 import uuid
@@ -22,6 +20,15 @@ class TaskRunner:
         self.project_root = project_root
         self.running_tasks: dict[str, dict] = {}
         self.completed_tasks: dict[str, dict] = {}
+
+    def _runs_dir(self) -> str:
+        return os.path.join(self.project_root, ".web-workbench", "runs")
+
+    def _run_log_rel_path(self, run_id: str) -> str:
+        return f".web-workbench/runs/{run_id}.log"
+
+    def _run_meta_path(self, run_id: str) -> str:
+        return os.path.join(self._runs_dir(), f"{run_id}.json")
 
     def detect_python(self) -> str:
         from .python_env_service import PythonEnvService
@@ -72,7 +79,7 @@ class TaskRunner:
             **popen_kwargs,
         )
 
-        runs_dir = os.path.join(self.project_root, ".web-workbench", "runs")
+        runs_dir = self._runs_dir()
         os.makedirs(runs_dir, exist_ok=True)
         log_path = os.path.join(runs_dir, f"{run_id}.log")
 
@@ -157,13 +164,18 @@ class TaskRunner:
             finally:
                 task_info = self.running_tasks.get(run_id)
                 if task_info:
-                    self.completed_tasks[run_id] = {
+                    finished_ts = time.time()
+                    finished_iso = datetime.now().isoformat()
+                    completed = {
                         "exit_code": exit_code,
                         "elapsed": elapsed,
                         "log_path": task_info.get("log_path"),
                         "file": task_info.get("file"),
-                        "finished_at": time.time(),
+                        "finished_at": finished_ts,
+                        "finished_at_iso": finished_iso,
                     }
+                    self.completed_tasks[run_id] = completed
+                    self._write_run_metadata(run_id, completed)
                 self._cleanup_expired()
                 self.running_tasks.pop(run_id, None)
 
@@ -228,3 +240,78 @@ class TaskRunner:
     def get_completed(self, run_id: str) -> dict | None:
         self._cleanup_expired()
         return self.completed_tasks.get(run_id)
+
+    def _write_run_metadata(self, run_id: str, completed: dict):
+        os.makedirs(self._runs_dir(), exist_ok=True)
+        meta = {
+            "run_id": run_id,
+            "file": completed.get("file", ""),
+            "exit_code": completed.get("exit_code"),
+            "elapsed": completed.get("elapsed"),
+            "log_path": self._run_log_rel_path(run_id),
+            "finished_at": completed.get("finished_at_iso") or datetime.now().isoformat(),
+        }
+        try:
+            with open(self._run_meta_path(run_id), "w", encoding="utf-8") as f:
+                json.dump(meta, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+
+    def get_run_history(self, limit: int = 50) -> list[dict]:
+        runs_dir = self._runs_dir()
+        os.makedirs(runs_dir, exist_ok=True)
+
+        records: dict[str, dict] = {}
+        try:
+            entries = sorted(
+                os.scandir(runs_dir),
+                key=lambda e: e.stat().st_mtime,
+                reverse=True,
+            )
+        except OSError:
+            return []
+
+        for entry in entries:
+            if not entry.is_file() or not entry.name.endswith(".json"):
+                continue
+            run_id = os.path.splitext(entry.name)[0]
+            try:
+                with open(entry.path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            data.setdefault("run_id", run_id)
+            data.setdefault("log_path", self._run_log_rel_path(run_id))
+            records[run_id] = data
+
+        for entry in entries:
+            if len(records) >= limit:
+                break
+            if not entry.is_file() or not entry.name.endswith(".log"):
+                continue
+            run_id = os.path.splitext(entry.name)[0]
+            if run_id in records:
+                continue
+            records[run_id] = {
+                "run_id": run_id,
+                "file": "",
+                "exit_code": None,
+                "elapsed": None,
+                "log_path": self._run_log_rel_path(run_id),
+                "finished_at": "",
+            }
+
+        def _mtime(record: dict) -> float:
+            meta_path = self._run_meta_path(record["run_id"])
+            log_path = os.path.join(self._runs_dir(), f"{record['run_id']}.log")
+            try:
+                return os.path.getmtime(meta_path)
+            except OSError:
+                try:
+                    return os.path.getmtime(log_path)
+                except OSError:
+                    return 0.0
+
+        return sorted(records.values(), key=_mtime, reverse=True)[:limit]

@@ -9,10 +9,20 @@ from .supervisor import WorkerSupervisor
 
 logger = logging.getLogger("hub.proxy")
 
+SESSION_COOKIE_NAMES = ("hy127_session", "code880_session")
+
 HOP_BY_HOP = frozenset({
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailers", "transfer-encoding", "upgrade",
 })
+
+
+def _first_cookie(cookies, names: tuple[str, ...] = SESSION_COOKIE_NAMES) -> str:
+    for name in names:
+        value = cookies.get(name)
+        if value:
+            return value
+    return ""
 
 
 def rewrite_http_path(original_path: str, workspace_id: str) -> str:
@@ -89,8 +99,9 @@ async def proxy_ws_to_worker(
     supervisor: WorkerSupervisor,
     verify_session_fn,
     allowed_origin: str = "",
+    session_cookie_names: tuple[str, ...] = SESSION_COOKIE_NAMES,
 ):
-    session_id = ws_client.cookies.get("code880_session")
+    session_id = _first_cookie(ws_client.cookies, session_cookie_names)
     if not session_id or not verify_session_fn(session_id):
         await ws_client.close(code=4001)
         return

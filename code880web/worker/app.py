@@ -60,7 +60,7 @@ def _read_hub_base_url() -> str:
 
 
 def init_services(project_root: str):
-    global file_service, preview_service, task_runner, ai_service, git_service, python_env_service, PROJECT_ROOT
+    global file_service, preview_service, task_runner, ai_service, git_service, python_env_service, run_config_service, PROJECT_ROOT
     PROJECT_ROOT = project_root
     file_service = FileService(project_root)
     preview_service = PreviewService(project_root)
@@ -395,23 +395,7 @@ async def stop_run(run_id: str):
 
 @app.get("/api/run/history")
 async def run_history():
-    import glob as _glob
-    runs_dir = os.path.join(PROJECT_ROOT, ".web-workbench", "runs")
-    runs = []
-    os.makedirs(runs_dir, exist_ok=True)
-    for log_path in sorted(_glob.glob(os.path.join(runs_dir, "*.log")), reverse=True)[:50]:
-        run_id = os.path.splitext(os.path.basename(log_path))[0]
-        completed = task_runner.get_completed(run_id)
-        if completed:
-            runs.append({
-                "run_id": run_id,
-                "file": completed.get("file", ""),
-                "exit_code": completed.get("exit_code"),
-                "elapsed": completed.get("elapsed"),
-                "log_path": log_path,
-                "finished_at": completed.get("finished_at"),
-            })
-    return {"runs": runs}
+    return {"runs": task_runner.get_run_history()}
 
 
 @app.post("/api/run/config")
@@ -517,7 +501,7 @@ async def ai_context_set(request: Request):
     body = await request.json()
     files = body.get("files", [])
     ai_service.set_context_files(files)
-    return {"status": "ok", "files": files}
+    return {"status": "ok", "files": ai_service.get_context_files()}
 
 
 @app.get("/api/ai/history")

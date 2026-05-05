@@ -21,8 +21,14 @@ class RunConfigService:
             return {"configurations": []}
 
     def save(self, config: dict) -> dict:
+        if not isinstance(config, dict):
+            raise ValueError("配置必须是对象")
         configurations = config.get("configurations", [])
+        if not isinstance(configurations, list):
+            raise ValueError("configurations 必须是数组")
         for item in configurations:
+            if not isinstance(item, dict):
+                raise ValueError("configuration 必须是对象")
             if item.get("type") != "python":
                 raise ValueError("当前只支持 python 类型")
             program = item.get("program", "")

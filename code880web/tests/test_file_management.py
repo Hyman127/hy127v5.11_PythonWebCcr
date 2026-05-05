@@ -76,6 +76,10 @@ class TestRename:
         with pytest.raises(FileExistsError):
             fs.rename("src/main.py", "other.py")
 
+    def test_rename_rejects_path_separator(self, fs):
+        with pytest.raises(ValueError, match="路径分隔符"):
+            fs.rename("src/main.py", "nested/app.py")
+
 
 class TestDeleteFile:
     def test_soft_delete_file(self, fs, tmp_path):

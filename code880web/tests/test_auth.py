@@ -116,6 +116,16 @@ class TestOriginCheck:
         request.headers = {"X-Code880-CSRF": csrf}
         auth_mgr.require_csrf(request)  # no Origin header = same-origin, should pass
 
+    def test_hy127_cookie_and_header_passes(self, auth_mgr):
+        request = MagicMock()
+        code = auth_mgr.create_bootstrap_code("/")
+        auth_mgr.handle_bootstrap(code)
+        session_id = list(auth_mgr._sessions.keys())[0]
+        csrf = auth_mgr._sessions[session_id]["csrf"]
+        request.cookies = {"hy127_session": session_id, "hy127_csrf": csrf}
+        request.headers = {"X-Hy127-CSRF": csrf, "Origin": "http://127.0.0.1:8800"}
+        auth_mgr.require_csrf(request)
+
 
 @pytest.fixture
 def hub_client(monkeypatch):

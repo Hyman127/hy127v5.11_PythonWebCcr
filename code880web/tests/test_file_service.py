@@ -54,6 +54,10 @@ class TestFileSave:
         backups = list(backup_dir.iterdir())
         assert len(backups) >= 1
 
+    def test_save_rejects_large_content(self, project):
+        with pytest.raises(ValueError, match="超过 2 MB"):
+            project.save_file("src/main.py", "x" * (2 * 1024 * 1024 + 1))
+
 
 class TestFileTree:
     def test_tree_returns_items(self, project):
