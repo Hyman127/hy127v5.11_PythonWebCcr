@@ -18,6 +18,9 @@ class BootstrapCode:
 class AuthManager:
     SESSION_TTL = 86400 * 7  # 7 days
     BOOTSTRAP_TTL = 60       # 60 seconds
+    SESSION_COOKIE_NAMES = ("hy127_session", "code880_session")
+    CSRF_COOKIE_NAMES = ("hy127_csrf", "code880_csrf")
+    CSRF_HEADER_NAMES = ("X-Hy127-CSRF", "X-Code880-CSRF")
 
     def __init__(self, keys_dir: str, hub_port: int = 0):
         self.keys_dir = keys_dir
@@ -29,6 +32,14 @@ class AuthManager:
 
         self._sessions: dict[str, dict] = {}
         self._bootstrap_codes: dict[str, BootstrapCode] = {}
+
+    @staticmethod
+    def _first_cookie(request: Request, names: tuple[str, ...]) -> str:
+        for name in names:
+            value = request.cookies.get(name)
+            if value:
+                return value
+        return ""
 
     def _write_launch_token(self) -> str:
         token_paths = [
@@ -85,14 +96,16 @@ class AuthManager:
         }
 
         response = RedirectResponse(url=bc.target, status_code=302)
-        response.set_cookie(
-            "code880_session", session_id,
-            httponly=True, samesite="strict", path="/"
-        )
-        response.set_cookie(
-            "code880_csrf", csrf_token,
-            httponly=False, samesite="strict", path="/"
-        )
+        for name in self.SESSION_COOKIE_NAMES:
+            response.set_cookie(
+                name, session_id,
+                httponly=True, samesite="strict", path="/"
+            )
+        for name in self.CSRF_COOKIE_NAMES:
+            response.set_cookie(
+                name, csrf_token,
+                httponly=False, samesite="strict", path="/"
+            )
         return response
 
     def verify_session(self, session_id: str) -> bool:
@@ -105,7 +118,7 @@ class AuthManager:
         return True
 
     def require_session(self, request: Request):
-        session_id = request.cookies.get("code880_session")
+        session_id = self._first_cookie(request, self.SESSION_COOKIE_NAMES)
         if not session_id or not self.verify_session(session_id):
             raise HTTPException(401, "会话无效")
 
@@ -122,8 +135,12 @@ class AuthManager:
 
     def require_csrf(self, request: Request):
         self.require_session(request)
-        csrf_cookie = request.cookies.get("code880_csrf")
-        csrf_header = request.headers.get("X-Code880-CSRF")
+        csrf_cookie = self._first_cookie(request, self.CSRF_COOKIE_NAMES)
+        csrf_header = ""
+        for name in self.CSRF_HEADER_NAMES:
+            csrf_header = request.headers.get(name, "")
+            if csrf_header:
+                break
         if not csrf_cookie or not csrf_header:
             raise HTTPException(403, "缺少 CSRF 凭证")
         if csrf_cookie != csrf_header:

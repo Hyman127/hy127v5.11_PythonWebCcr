@@ -26,6 +26,7 @@ PREVIEW_EXTENSIONS = {".pdf", ".xlsx", ".docx", ".pptx"}
 
 
 PROTECTED_TOP_NAMES = {".git", ".venv", ".web-workbench", ".hy127web_global"}
+MAX_TEXT_SAVE_BYTES = 2 * 1024 * 1024
 
 
 class FileService:
@@ -38,6 +39,17 @@ class FileService:
         protected_lower = {n.lower() for n in PROTECTED_TOP_NAMES}
         if lower_parts & protected_lower:
             raise ValueError("禁止操作受保护的目录")
+
+    @staticmethod
+    def _check_leaf_name(name: str):
+        if not name or not name.strip():
+            raise ValueError("名称不能为空")
+        if "/" in name or "\\" in name:
+            raise ValueError("名称不能包含路径分隔符")
+        if name in (".", ".."):
+            raise ValueError("名称不合法")
+        if "\0" in name:
+            raise ValueError("名称不能包含空字符")
 
     def get_tree(self, rel_dir: str = "", depth: int = 3) -> list[dict]:
         if rel_dir and not validate_path(self.project_root, rel_dir):
@@ -137,6 +149,10 @@ class FileService:
             raise ValueError("路径不合法")
         self._check_protected(rel_path)
 
+        raw = content.encode("utf-8")
+        if len(raw) > MAX_TEXT_SAVE_BYTES:
+            raise ValueError("文件超过 2 MB，禁止通过 Web 编辑保存")
+
         abs_path = os.path.join(self.project_root, rel_path)
 
         if base_sha256 and os.path.isfile(abs_path):
@@ -149,7 +165,6 @@ class FileService:
             self._backup(abs_path, rel_path)
 
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        raw = content.encode("utf-8")
         with open(abs_path, "wb") as f:
             f.write(raw)
 
@@ -193,8 +208,7 @@ class FileService:
         if not validate_path(self.project_root, rel_path):
             raise ValueError("路径不合法")
         self._check_protected(rel_path)
-        if not new_name or not new_name.strip():
-            raise ValueError("名称不能为空")
+        self._check_leaf_name(new_name)
         abs_path = os.path.join(self.project_root, rel_path)
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f"不存在: {rel_path}")

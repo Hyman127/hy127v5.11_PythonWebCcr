@@ -613,14 +613,19 @@ const TreeNode = {
   }
 };
 
+function getCookie(name) {
+  const found = document.cookie.split('; ').find(c => c.startsWith(`${name}=`));
+  return found ? decodeURIComponent(found.split('=').slice(1).join('=')) : '';
+}
+
 function getCsrf() {
-  const m = document.cookie.split('; ').find(c => c.startsWith('code880_csrf='));
-  return m ? m.split('=')[1] : '';
+  return getCookie('hy127_csrf') || getCookie('code880_csrf') || '';
 }
 
 function apiFetch(url, opts = {}) {
   const headers = { ...opts.headers };
   if (['POST','PUT','DELETE','PATCH'].includes((opts.method||'GET').toUpperCase())) {
+    headers['X-Hy127-CSRF'] = getCsrf();
     headers['X-Code880-CSRF'] = getCsrf();
     if (!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
   }
@@ -775,8 +780,13 @@ createApp({
       document.addEventListener('keydown', onGlobalKey);
     });
 
+    onMounted(() => {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    });
+
     onUnmounted(() => {
       document.removeEventListener('keydown', onGlobalKey);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (runWs) runWs.close();
     });
 
@@ -809,10 +819,27 @@ createApp({
       loadWorkspace();
     }
 
+    function hasDirtyFiles() {
+      return openFiles.value.some(f => f._dirty);
+    }
+
+    function confirmLeaveDirty() {
+      if (!hasDirtyFiles()) return true;
+      return confirm('当前有未保存的文件，确定离开吗？');
+    }
+
     function goHome() {
+      if (!confirmLeaveDirty()) return;
+      if (runWs) runWs.close();
       currentView.value = 'home';
       history.pushState(null, '', '/');
       loadProjects();
+    }
+
+    function handleBeforeUnload(e) {
+      if (!hasDirtyFiles()) return;
+      e.preventDefault();
+      e.returnValue = '';
     }
 
     async function loadWorkspace() {

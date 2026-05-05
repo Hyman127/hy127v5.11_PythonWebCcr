@@ -12,6 +12,17 @@ class GitService:
     def __init__(self, project_root: str):
         self.project_root = project_root
 
+    @staticmethod
+    def _run_git(args: list[str], *, cwd: str, timeout: int = 5, text: bool = True):
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=text,
+            timeout=timeout,
+            shell=False,
+        )
+
     def available(self) -> dict:
         git_installed = shutil.which("git") is not None
         is_repo = False
@@ -65,6 +76,9 @@ class GitService:
                     continue
                 xy = line[:2]
                 fname = line[3:].strip()
+                if " -> " in fname:
+                    old_name, new_name = fname.split(" -> ", 1)
+                    fname = new_name
                 if xy[0] in "MRC" or (xy[0] == "A" and xy[1] != "?"):
                     staged.append(fname)
                 if xy[1] in "MRC" or (xy[1] == "M" and xy[0] != "?"):
@@ -270,7 +284,7 @@ class GitService:
             from pathlib import Path
             Path(repo_root).resolve().relative_to(Path(self.project_root).resolve())
             return True
-        except ValueError:
+        except (ValueError, OSError):
             return False
 
     @staticmethod

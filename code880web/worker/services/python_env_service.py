@@ -58,9 +58,18 @@ class PythonEnvService:
                 selected = {"path": venv_python, "source": ".venv", "exists": True, "version": c["version"]}
             candidates.append(c)
 
-        global_dir = os.environ.get("CODE880WEB_GLOBAL_DIR", "").strip()
+        global_dir = os.environ.get("HY127WEB_GLOBAL_DIR", "").strip() or os.environ.get("CODE880WEB_GLOBAL_DIR", "").strip()
         if not global_dir:
-            global_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Code880Web")
+            localappdata = os.environ.get("LOCALAPPDATA", "").strip()
+            if localappdata:
+                hy127_dir = os.path.join(localappdata, "Hy127Web")
+                code880_dir = os.path.join(localappdata, "Code880Web")
+                global_dir = hy127_dir if os.path.isdir(hy127_dir) else code880_dir
+            else:
+                state_home = os.environ.get("XDG_STATE_HOME", "").strip()
+                if not state_home:
+                    state_home = os.path.join(os.path.expanduser("~"), ".local", "state")
+                global_dir = os.path.join(state_home, "hy127web")
         install_file = os.path.join(global_dir, "install.json")
         if os.path.isfile(install_file):
             try:

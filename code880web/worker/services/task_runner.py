@@ -24,47 +24,13 @@ class TaskRunner:
         self.completed_tasks: dict[str, dict] = {}
 
     def detect_python(self) -> str:
-        config_file = Path(self.project_root) / ".web-workbench" / "config.json"
-        if config_file.exists():
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    config = json.load(f)
-                    python = config.get("python_path")
-                    if python and os.path.isfile(python):
-                        return python
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        if sys.platform == "win32":
-            venv_python = Path(self.project_root) / ".venv" / "Scripts" / "python.exe"
-        else:
-            venv_python = Path(self.project_root) / ".venv" / "bin" / "python"
-        if venv_python.exists():
-            return str(venv_python)
-
-        global_dir = os.environ.get("CODE880WEB_GLOBAL_DIR", "").strip()
-        if not global_dir:
-            global_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Code880Web")
-        install_file = os.path.join(global_dir, "install.json")
-        if os.path.isfile(install_file):
-            try:
-                with open(install_file, "r", encoding="utf-8") as f:
-                    install = json.load(f)
-                    python = install.get("python_path")
-                    if python and os.path.isfile(python):
-                        return python
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        if os.path.isfile(sys.executable):
-            return sys.executable
-
-        import shutil
-        for name in ("python3", "python"):
-            path = shutil.which(name)
-            if path:
-                return path
-
+        from .python_env_service import PythonEnvService
+        selected = PythonEnvService(self.project_root).get_selected_interpreter()
+        path = selected.get("path", "")
+        if selected.get("exists") and path:
+            return path
+        if path:
+            return path
         return "python"
 
     async def start_run(self, file_rel_path: str, args: list[str] | None = None) -> str:

@@ -13,6 +13,7 @@ from .services.git_service import GitService
 from .services.preview_service import PreviewService
 from .services.python_env_service import PythonEnvService
 from .services.task_runner import TaskRunner
+from .services.run_config_service import RunConfigService
 
 RUN_ID_RE = re.compile(r"^[a-f0-9]{8}$")
 
@@ -27,17 +28,34 @@ task_runner: TaskRunner | None = None
 ai_service: AIService | None = None
 git_service: GitService | None = None
 python_env_service: PythonEnvService | None = None
+run_config_service: RunConfigService | None = None
 
 
 def _read_hub_base_url() -> str:
-    runtime_path = os.path.join(
-        os.environ.get("LOCALAPPDATA", ""), "Code880Web", "hub_runtime.json"
-    )
-    if os.path.isfile(runtime_path):
-        import json as _json
-        with open(runtime_path, "r", encoding="utf-8") as f:
-            data = _json.load(f)
-        return data.get("base_url", "")
+    import json as _json
+
+    candidates = []
+    for env_name in ("HY127WEB_GLOBAL_DIR", "CODE880WEB_GLOBAL_DIR"):
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            candidates.append(value)
+
+    localappdata = os.environ.get("LOCALAPPDATA", "").strip()
+    if localappdata:
+        candidates.append(os.path.join(localappdata, "Hy127Web"))
+        candidates.append(os.path.join(localappdata, "Code880Web"))
+
+    state_home = os.environ.get("XDG_STATE_HOME", "").strip()
+    if not state_home:
+        state_home = os.path.join(os.path.expanduser("~"), ".local", "state")
+    candidates.append(os.path.join(state_home, "hy127web"))
+
+    for global_dir in candidates:
+        runtime_path = os.path.join(global_dir, "hub_runtime.json")
+        if os.path.isfile(runtime_path):
+            with open(runtime_path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            return data.get("base_url", "")
     return ""
 
 
@@ -54,6 +72,7 @@ def init_services(project_root: str):
     )
     git_service = GitService(project_root)
     python_env_service = PythonEnvService(project_root)
+    run_config_service = RunConfigService(project_root)
 
 
 # ── Token verification middleware ──
@@ -372,6 +391,41 @@ async def stop_run(run_id: str):
         raise HTTPException(400, "run_id 格式不合法")
     await task_runner.stop_run(run_id)
     return {"status": "stopped"}
+
+
+@app.get("/api/run/history")
+async def run_history():
+    import glob as _glob
+    runs_dir = os.path.join(PROJECT_ROOT, ".web-workbench", "runs")
+    runs = []
+    os.makedirs(runs_dir, exist_ok=True)
+    for log_path in sorted(_glob.glob(os.path.join(runs_dir, "*.log")), reverse=True)[:50]:
+        run_id = os.path.splitext(os.path.basename(log_path))[0]
+        completed = task_runner.get_completed(run_id)
+        if completed:
+            runs.append({
+                "run_id": run_id,
+                "file": completed.get("file", ""),
+                "exit_code": completed.get("exit_code"),
+                "elapsed": completed.get("elapsed"),
+                "log_path": log_path,
+                "finished_at": completed.get("finished_at"),
+            })
+    return {"runs": runs}
+
+
+@app.post("/api/run/config")
+async def run_config_save(request: Request):
+    body = await request.json()
+    try:
+        return run_config_service.save(body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/run/config")
+async def run_config_load():
+    return run_config_service.load()
 
 
 @app.get("/api/run/{run_id}/log")

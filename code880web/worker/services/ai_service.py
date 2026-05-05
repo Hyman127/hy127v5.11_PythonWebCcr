@@ -3,6 +3,8 @@ import os
 
 import httpx
 
+from .security import validate_path
+
 
 class AIService:
     """Worker-side AI service.
@@ -19,7 +21,16 @@ class AIService:
         self._chat_history: list[dict] = []
 
     def set_context_files(self, files: list[str]):
-        self._context_files = files
+        safe_files = []
+        for rel_path in files:
+            if not isinstance(rel_path, str):
+                continue
+            if not validate_path(self.project_root, rel_path):
+                continue
+            abs_path = os.path.join(self.project_root, rel_path)
+            if os.path.isfile(abs_path):
+                safe_files.append(rel_path.replace("\\", "/"))
+        self._context_files = safe_files[:50]
 
     def get_context_files(self) -> list[str]:
         return self._context_files
@@ -27,6 +38,8 @@ class AIService:
     def _build_context(self) -> str:
         parts = []
         for rel_path in self._context_files:
+            if not validate_path(self.project_root, rel_path):
+                continue
             abs_path = os.path.join(self.project_root, rel_path)
             if not os.path.isfile(abs_path):
                 continue
@@ -106,8 +119,17 @@ class AIService:
                             break
                         try:
                             chunk = json.loads(data_str)
-                            delta = chunk["choices"][0].get("delta", {})
-                            content = delta.get("content", "")
+                            # Hub relay normalized format
+                            if chunk.get("type") == "content":
+                                content = chunk.get("data", "")
+                            elif chunk.get("type") == "error":
+                                err = chunk.get("data", "AI relay error")
+                                yield json.dumps({"type": "error", "data": err}, ensure_ascii=False) + "\n"
+                                return
+                            else:
+                                # Provider raw OpenAI-compatible fallback
+                                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                                content = delta.get("content", "")
                             if content:
                                 full_response += content
                                 yield json.dumps({"type": "content", "data": content}) + "\n"

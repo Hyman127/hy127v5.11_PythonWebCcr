@@ -6,11 +6,31 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+def first_env(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
 def get_global_dir() -> str:
-    override = os.environ.get("CODE880WEB_GLOBAL_DIR", "").strip()
+    override = first_env("HY127WEB_GLOBAL_DIR", "CODE880WEB_GLOBAL_DIR")
     if override:
         return override
-    return os.path.join(os.environ.get("LOCALAPPDATA", ""), "Code880Web")
+
+    localappdata = os.environ.get("LOCALAPPDATA", "").strip()
+    if localappdata:
+        hy127_dir = os.path.join(localappdata, "Hy127Web")
+        code880_dir = os.path.join(localappdata, "Code880Web")
+        if os.path.exists(hy127_dir):
+            return hy127_dir
+        return code880_dir
+
+    state_home = os.environ.get("XDG_STATE_HOME", "").strip()
+    if not state_home:
+        state_home = os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(state_home, "hy127web")
 
 
 @dataclass
@@ -25,12 +45,13 @@ class InstallInfo:
 
 
 def read_install_info() -> InstallInfo:
-    override_root = os.environ.get("CODE880WEB_INSTALL_ROOT", "").strip()
+    override_root = first_env("HY127WEB_INSTALL_ROOT", "CODE880WEB_INSTALL_ROOT")
     if override_root:
         code880web_dir = os.path.join(override_root, "code880web")
+        python_path = first_env("HY127WEB_PYTHON_PATH", "CODE880WEB_PYTHON_PATH") or sys.executable
         return InstallInfo(
             install_root=override_root,
-            python_path=os.environ.get("CODE880WEB_PYTHON_PATH", "").strip() or sys.executable,
+            python_path=python_path,
             hub_app_path=os.path.join(code880web_dir, "hub", "app.py"),
             worker_app_path=os.path.join(code880web_dir, "worker", "app.py"),
             static_path=os.path.join(code880web_dir, "static"),

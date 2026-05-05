@@ -369,18 +369,36 @@ AI Runtime
 | AI 上下文选择 | 已有 | 可让 AI 基于选中文件回答 |
 | 多项目隔离 | 架构已有 | 多个 Python 项目互不干扰 |
 
-### 6.2 当前主要短板
+### 6.2 当前代码基线
 
-| 短板 | 当前表现 | 影响 |
-|---|---|---|
-| 编辑闭环未打通 | Monaco 当前 `readOnly: true` | 不能直接在 Web 中改代码 |
-| 保存前端缺失 | 后端有 `/api/files/save`，前端未接入 | 文件修改能力没有形成产品闭环 |
-| 文件管理不足 | 缺少新建、删除、重命名 | 项目维护能力不足 |
-| Git 辅助缺失 | 无 status、diff、commit 相关接口 | 不利于真实开发 |
-| 依赖环境管理不足 | 无 `.venv` 检测、依赖安装、解释器选择 UI | Python 项目运行稳定性不足 |
-| 终端能力不足 | 当前只支持运行 `.py` | 不能覆盖常见开发命令 |
-| AI 只能聊天 | 不能主动读写、运行、验证 | 还不是编程 Agent |
-| Linux 兼容不足 | Worker 启动和运行有 Windows 专属代码 | Ubuntu 服务器上无法原样完整启动，部分路径会因 Windows 常量不存在而失败 |
+下表反映 2026-05-05 代码实际状态，替代早期短板分析：
+
+| 能力 | 方案原判断 | 当前代码事实 | 后续动作 |
+|---|---|---|---|
+| Monaco 编辑保存 | 未打通 | 已有 dirty、Ctrl+S、/api/files/save | 补 beforeunload、E2E 测试、服务端大文件限制 |
+| 文件管理 | 缺少 API | 已有 create/mkdir/rename/delete/copy | 补 rename 叶子名校验、强确认、前端体验 |
+| Python 环境 | 缺解释器 API | 已有 PythonEnvService 和 3 个 API | 补 install/history/config |
+| Git 辅助 | 缺 status/diff | 已有 GitService 和只读 API | 补未跟踪文件 diff、错误状态、前端面板完整性 |
+| AIRuntime | 建议新增 | 已有 base/direct_http/errors | 修 chat relay 协议，补测试 |
+| Ubuntu dev 启动 | 建议新增 | 已有 scripts/dev_start_web.py | 修 runtime 路径和依赖验证 |
+
+优先级重排：
+
+```markdown
+P0:
+- AI relay 协议错配
+- Worker runtime 路径兼容
+- AI context 路径校验
+- 方案状态重基线
+- 测试环境可运行
+
+P1:
+- 文件服务安全加固
+- 前端未保存变更保护
+- GitService 边界和 diff 完整性
+- PythonEnvService 与 TaskRunner 去重
+- run history / run config
+```
 
 ## 7. 分阶段优化路线
 
