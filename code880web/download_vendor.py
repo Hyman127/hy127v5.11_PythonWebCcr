@@ -28,7 +28,7 @@ DOWNLOADS = [
     },
 ]
 
-MONACO_BASE = "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min"
+MONACO_BASE = "https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min"
 MONACO_FILES = [
     "vs/loader.js",
     "vs/editor/editor.main.js",

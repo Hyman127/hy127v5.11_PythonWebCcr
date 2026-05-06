@@ -6,7 +6,7 @@
 <title>Hy127 Web 工作台</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
 <script src="/vendor/vue.global.prod.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@3/dist/vue.global.prod.js'"></script>
-<script src="/vendor/monaco/vs/loader.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js'"></script>
+<script src="/vendor/monaco/vs/loader.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min/vs/loader.js'"></script>
 <script src="/vendor/marked.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'"></script>
 <style>
 :root {
@@ -936,7 +936,7 @@ createApp({
       if (!window.monaco) {
         await new Promise((resolve) => {
           const monacoLocalPath = '/vendor/monaco/vs';
-          const monacoCdnPath = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs';
+          const monacoCdnPath = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min/vs';
           require.config({ paths: { 'vs': monacoLocalPath }, waitSeconds: 5 });
           require(['vs/editor/editor.main'], () => resolve());
         });

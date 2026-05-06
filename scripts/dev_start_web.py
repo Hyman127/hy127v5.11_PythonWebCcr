@@ -49,14 +49,13 @@ def ensure_env():
 
 
 def start_hub() -> subprocess.Popen:
-    hub_app = os.path.join(PROJECT_ROOT, "code880web", "hub", "app.py")
     if sys.platform == "win32":
         popen_kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
     else:
         popen_kwargs = {"start_new_session": True}
 
     proc = subprocess.Popen(
-        [sys.executable, hub_app],
+        [sys.executable, "-m", "code880web.hub.app"],
         cwd=PROJECT_ROOT,
         env=os.environ.copy(),
         **popen_kwargs,

@@ -350,6 +350,25 @@ async def start_run(request: Request):
     return {"run_id": run_id, "status": "running"}
 
 
+@app.get("/api/run/history")
+async def run_history():
+    return {"runs": task_runner.get_run_history()}
+
+
+@app.post("/api/run/config")
+async def run_config_save(request: Request):
+    body = await request.json()
+    try:
+        return run_config_service.save(body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/run/config")
+async def run_config_load():
+    return run_config_service.load()
+
+
 @app.get("/api/run/{run_id}")
 async def get_run_status(run_id: str):
     if not RUN_ID_RE.match(run_id):
@@ -391,25 +410,6 @@ async def stop_run(run_id: str):
         raise HTTPException(400, "run_id 格式不合法")
     await task_runner.stop_run(run_id)
     return {"status": "stopped"}
-
-
-@app.get("/api/run/history")
-async def run_history():
-    return {"runs": task_runner.get_run_history()}
-
-
-@app.post("/api/run/config")
-async def run_config_save(request: Request):
-    body = await request.json()
-    try:
-        return run_config_service.save(body)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-
-
-@app.get("/api/run/config")
-async def run_config_load():
-    return run_config_service.load()
 
 
 @app.get("/api/run/{run_id}/log")
