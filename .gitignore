@@ -13,3 +13,6 @@ pytest-cache-files-*/
 .trae/
 .lingma/
 .claude/
+AI模型.md
+init_log.txt
+init_exit_trace.txt

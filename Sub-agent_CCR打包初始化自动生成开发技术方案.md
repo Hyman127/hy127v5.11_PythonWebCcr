@@ -1,18 +1,26 @@
 # Sub-agent + CCR 打包初始化自动生成开发技术方案
 
-> 版本：v3.2（Hy127 架构适配稿 — 基于 git 基线 6160220 + 1cde8dc）
+> 版本：v3.3（安全加固 + 边界统一稿）
 > 日期：2026-05-07
-> Git 基线：`6160220` (origin/master, fix: Hub 启动方式、路由顺序、Monaco 安全版本升级) + `1cde8dc` (feat: 引入 Sub-agent + CCR 模型绑定基础设施，含 ai_providers.py、ai_models_config.json)
-> 范围：本项目已从 `code880web` 重命名为 `hy127web`，已包含 `ai_providers.py`、`ai_models_config.json`。`重新初始化 V1.24.ps1` 默认生成 HY127 受管理 Sub-agent 基础模板，初始化成功后由用户运行 `src\sub_agent_ccr_model_config.py` 配置 Sub-agent 角色与 AI 模型绑定。本方案只给开发落地边界和实现细节，不直接写入用户密钥或 CCR provider 配置。
+> Git 基线：`6160220` (origin/master, fix: Hub 启动方式、路由顺序、Monaco 安全版本升级) + `1cde8dc` (feat: 引入 Sub-agent + CCR 模型绑定基础设施，含 ai_providers.py、ai_models_config.json) + `f762f9b` (refactor: 项目目录重命名 code880web → hy127web)
+> 范围：本项目已从 `code880web` 重命名为 `hy127web`，已包含 `ai_providers.py`、`ai_models_config.json`（代码基础已就绪，但 Sub-agent/CCR 核心文件尚未落地）。实施完成后，`重新初始化 V1.24.ps1` 将改造为默认生成 HY127 受管理 Sub-agent 基础模板，初始化成功后由用户运行 `src\sub_agent_ccr_model_config.py` 配置 Sub-agent 角色与 AI 模型绑定。本方案只给开发落地边界和实现细节，不直接写入用户密钥或 CCR provider 配置。
 > v3.2 修订要点：
 > - 目录重命名适配：`code880web` → `hy127web`，源码、路径、模块名、env var 全部修正；保留 `code880_session`/`code880_csrf` cookie 和 `Code880Web` 目录 fallback
 > - 落地清单修正：基于实际 git 基线标注每个文件存在状态；`必须重新初始化说明.md` 从"修改"更正为"新建"
 > - Git 基线说明：回退到 `6160220` + 新 commit `1cde8dc` 纳入 AI 基础设施
 > - 架构一致性：`pyproject.toml` testpaths 已改为 `hy127web/tests`，`.gitignore` 已含 `.claude/`
 > - 原 v3.1 复核修订要点仍适用：frontmatter 第 1 行 `---`；`model: inherit` 默认；`hy127_managed` 版本管理；tools 逗号分隔；日志路径脱敏；同步逻辑保持版本比较、路径校验、原子写入和模板自检
+>
+> v3.3 修订要点（基于复核意见）：
+> - P0 安全前提：新增 § 0 节，要求在开发实施前先清理 `AI模型.md` 中的明文密钥并彻底清除 git 历史，否则禁止提交
+> - P1 边界统一：§ 4 `ai_models_config.json` 描述去除 `base_url`，改为"CCR UI 不读写 base_url/endpoint，该字段仅属于现有通用 AI 调用管理模块职责"
+> - P1 禁止旧密钥路径：§ 3、§ 21.1、§ 21.5.3 明确禁止 Sub-agent/CCR 新代码调用 `ai_providers.py` 中从 Markdown 解析密钥或向用户级环境变量写入密钥的兼容函数
+> - P2 路径穿越加固：§ 9 `StartsWith` 检查追加目录分隔符边界；补充目标文件 reparse point 检查；更新前写入备份从"可选"升级为"推荐"，伪代码补充备份逻辑
+> - P2 新增测试用例：§ 14 补充"重复初始化"和"UI 绑定保存但渲染失败"两个测试场景
 
 ## 目录
 
+- [0. 前置安全清理要求（P0）](#0-前置安全清理要求p0)
 - [1. 背景和结论](#1-背景和结论)
 - [2. 目标](#2-目标)
 - [3. 非目标](#3-非目标)
@@ -36,6 +44,34 @@
 - [21. 面向 DeepSeek 类实现模型的开发执行细节](#21-面向-deepseek-类实现模型的开发执行细节)
 - [22. 前置化模型绑定与 UI 配置层](#22-前置化模型绑定与-ui-配置层)
 - [23. 一句话方案](#23-一句话方案)
+
+## 0. 前置安全清理要求（P0）
+
+以下是开始本方案任何开发工作的前置条件，必须先行处理，完成前不应提交或推送本方案相关代码。
+
+### 0.1 AI模型.md 密钥泄露
+
+仓库根目录 `AI模型.md` 第 2 行起含有明文 API Key 和带 Bearer Token 的 curl 示例，与本方案"不保存密钥"原则直接冲突。
+
+必须按以下顺序处理：
+
+1. **立即撤销/轮换**文件中涉及的所有 API Key 和 Token（联系对应 provider 的控制台执行）。
+2. **清理文件内容**：将 `AI模型.md` 中的密钥和 Bearer Token 全部替换为脱敏占位符（如 `<YOUR_API_KEY>`），或删除含密钥的段落，保留文档结构。
+3. **清理 git 历史**：密钥一旦进入 git 历史，仅修改文件内容不足以消除泄露风险。使用 `git filter-repo` 或 `BFG Repo Cleaner` 从历史中彻底移除含密钥的内容；操作前备份仓库，并通知所有已克隆的协作者强制重新拉取。
+4. **加入 .gitignore 或改为模板**：完成清理后，将 `AI模型.md` 加入 `.gitignore`（若该文件仅作本地参考），或改为脱敏模板文件名（如 `AI模型.example.md`）并在 README 中说明。
+
+在以上步骤完成之前，不应进行本方案的任何代码提交和推送。
+
+### 0.2 ai_providers.py 旧密钥兼容路径
+
+`ai_providers.py` 当前仍保留：
+
+- 从 Markdown 文档解析密钥的兼容函数（约第 560 行附近）
+- 向用户级环境变量写入密钥的兼容函数（约第 595 行附近）
+
+这两条路径本方案不要求删除（属于现有通用 AI 调用管理的历史兼容功能），但**本方案新增的所有 Sub-agent/CCR 代码路径**（`sub_agent_ccr_model_config.py`、`sub_agent_ccr_renderer.py`、`ai_providers.py` 新增函数）**必须完全绕开这两个函数**，不得直接或间接调用。
+
+如需后续废弃这两个函数，应由独立重构 PR 处理，不纳入本方案范围。
 
 ## 1. 背景和结论
 
@@ -107,6 +143,8 @@ Windows: %USERPROFILE%\.claude\agents
 6. 不默认修改用户已有的非本工具生成 agent。
 7. 不让 `重新初始化 V1.24.ps1` 直接写入用户 API Key、Base URL 或 CCR provider endpoint。
 8. 不把模型绑定 UI 做进 `一键安装.exe`，该 UI 只作为项目内 `src` 路径下的独立配置工具。
+9. 不在新增的 Sub-agent/CCR 代码（`sub_agent_ccr_model_config.py`、`sub_agent_ccr_renderer.py`、`ai_providers.py` 新增部分）中调用 `ai_providers.py` 现有从 Markdown 解析密钥的兼容函数（见 § 0.2）。
+10. 不在新增的 Sub-agent/CCR 代码中调用 `ai_providers.py` 现有向用户级环境变量写入密钥的兼容函数（见 § 0.2）。
 
 ## 4. 推荐目录结构
 
@@ -134,7 +172,7 @@ src/
 
 - `.claude_templates/agents/*.md` 是开箱即用主流程必须安装的基础模板，默认 `model: inherit`。
 - `agent_role_binding.json` 保存角色到模型的绑定，用户可通过 UI 修改。
-- `ai_models_config.json` 保存 provider、base_url、模型列表，不保存 API Key。
+- `ai_models_config.json` 保存 provider 标识、模型清单、推荐绑定和展示名称，不保存 API Key、Base URL 或 endpoint。注：若现有 `ai_providers.py` 的通用 provider 管理功能保留 `base_url` 字段，`sub_agent_ccr_model_config.py` 不读取也不写入该字段，两者职责分离——`base_url`/endpoint 仅属于现有通用 AI 调用管理模块的职责，不属于 CCR 角色绑定清单。
 - `ai_providers.py` 继续作为 provider/model 读取、校验、刷新和密钥状态检查的统一模块。
 - `src\sub_agent_ccr_model_config.py` 是用户初始化成功后点击运行的配置 UI，也是模型绑定生效前的必经入口。
 - `src\sub_agent_ccr_renderer.py` 是 UI 和命令行复用的渲染/同步逻辑，必须能从 `.claude_templates/agents` 补齐缺失的受管理 agent。
@@ -256,17 +294,19 @@ tools: Read, Write, Edit, Bash, Grep
 | 文件存在，但无 `hy127_managed` 字段 | 跳过，记录 `SKIP_CONFLICT` |
 | 目录无法创建或写入 | 记录 `WARN`，不阻断 Python 初始化 |
 
-可选增强：
+推荐增强（第一阶段起建议实现）：
 
-- 更新受管理文件前写入备份：
+- 更新受管理文件前写入备份到用户 `.hy127_backup` 目录：
 
 ```text
 %USERPROFILE%\.claude\.hy127_backup\reviewer.md.bak-20260506-153012
 ```
 
-- 或记录旧内容 hash 到日志中。
+备份失败必须递增 `$warnings` 并写日志（`[WARN] Backup failed for ...`），不阻断更新；备份目录创建失败同理。
 
-第一阶段建议不做 hash，但必须做 `hy127_managed` 版本比较，不能无差别覆盖所有受管理文件。
+- 或记录旧内容 hash 到日志中（作为备份的替代，但备份比 hash 更易恢复）。
+
+第一阶段建议实现备份，必须做 `hy127_managed` 版本比较，不能无差别覆盖所有受管理文件。
 
 ## 7. 初始化脚本改造方案
 
@@ -535,9 +575,17 @@ function Install-ClaudeAgentTemplates {
 
         $target = Join-Path $agentsDir $template.Name
         $targetFullPath = [System.IO.Path]::GetFullPath($target)
-        if (-not $targetFullPath.StartsWith($agentsDirFullPath, [StringComparison]::OrdinalIgnoreCase)) {
+        $agentsDirBoundary = $agentsDirFullPath + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $targetFullPath.StartsWith($agentsDirBoundary, [StringComparison]::OrdinalIgnoreCase)) {
             $warnings += 1
             Write-Log "[WARN] Path traversal blocked: $($template.Name)"
+            continue
+        }
+
+        if ((Test-Path -LiteralPath $target) -and
+            (((Get-Item -LiteralPath $target -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            $warnings += 1
+            Write-Log "[WARN] Skipped target reparse point: $($template.Name)"
             continue
         }
 
@@ -551,6 +599,17 @@ function Install-ClaudeAgentTemplates {
         $targetMetadata = Get-HY127AgentMetadata -Path $targetFullPath
         if ($null -ne $targetMetadata -and $targetMetadata.ManagedName -eq $expectedName -and $null -ne $targetMetadata.Version) {
             if ($targetMetadata.Version -lt $templateMetadata.Version) {
+                $backupDir = Join-Path $homeDir '.claude\.hy127_backup'
+                if (-not (Test-Path -LiteralPath $backupDir)) {
+                    New-Item -ItemType Directory -Path $backupDir -Force -ErrorAction SilentlyContinue | Out-Null
+                }
+                $backupName = [System.IO.Path]::GetFileNameWithoutExtension($template.Name) + '.md.bak-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+                try {
+                    Copy-Item -LiteralPath $targetFullPath -Destination (Join-Path $backupDir $backupName) -Force -ErrorAction Stop
+                } catch {
+                    $warnings += 1
+                    Write-Log ("[WARN] Backup failed for {0}: {1}" -f $template.Name, $_.Exception.Message)
+                }
                 Copy-FileAtomically -SourcePath $template.FullName -TargetPath $targetFullPath
                 $updated += 1
                 Write-Log ("Updated managed Claude agent: {0}" -f (Get-DisplayClaudeAgentsPath -Path $targetFullPath))
@@ -923,6 +982,36 @@ hy127_managed: reviewer-v1.0.0
 - 记录 WARN
 - 目标路径必须仍在 `~\.claude\agents` 下
 
+### 14.11 重复初始化
+
+前置：
+
+```text
+已完整运行过重新初始化，%USERPROFILE%\.claude\agents 下已有全部 5 个 hy127_managed 受管理 agent，版本与模板一致。
+```
+
+预期：
+
+- 重新运行初始化后，所有 5 个 agent 均被跳过（`SKIP_SAME_VERSION`）
+- Summary 统计 created 0, updated 0, skipped 5, warnings 0
+- 不产生重复文件、临时文件残留或异常日志
+- Python 初始化主流程不受影响
+
+### 14.12 UI 保存绑定但渲染失败
+
+前置：
+
+```text
+agent_role_binding.json 已保存绑定，但 ~/.claude/agents/implementer.md 对应目标不可写（如权限受限）或目标为 reparse point。
+```
+
+预期：
+
+- `agent_role_binding.json` 已写入绑定（持久保存成功）
+- UI 显示阻断性提示：绑定已保存，但 implementer agent 渲染失败，当前绑定未在 Claude Code 生效
+- 不假装渲染成功，不静默跳过失败
+- 不删除或污染其他正常受管理 agent
+
 ## 15. 验证命令
 
 Windows 手工验证：
@@ -1207,6 +1296,7 @@ v3.2 实施完成后，最小验收口径：
 8. 所有新增 Markdown 模板必须使用 UTF-8，首行必须是 `---`。
 9. 基础模板必须使用 `model: inherit`，不能硬编码 `deepseek,*`、`qwen,*`、`mimo,*` 等第三方模型。
 10. 只有 `src\sub_agent_ccr_model_config.py` / `src\sub_agent_ccr_renderer.py` 可以把 UI 选择渲染为 `model: <native-model-id>` 或 `model: <provider>,<model>`。
+11. 不调用 `ai_providers.py` 中任何从 Markdown 文档解析密钥的兼容函数，也不调用向用户级环境变量写入密钥的兼容函数（见 § 0.2）；这两类路径属于历史兼容代码，Sub-agent/CCR 新增代码路径必须完全绕开。
 
 执行完成后的输出格式：
 
@@ -1617,6 +1707,7 @@ validate_binding(config, binding) -> ValidationResult
 - 只做结构校验和展示辅助。
 - 不读取 `.env`，不读取用户密钥文件。
 - 不直接调用 CCR 网络接口。
+- Sub-agent/CCR UI 代码只能调用本节定义的 `load_models_config`、`load_agent_bindings`、`save_agent_bindings`、`list_route_options`、`validate_binding` 接口；`ai_providers.py` 中从 Markdown 解析密钥的兼容函数和向用户级环境变量写入密钥的兼容函数（见 § 0.2）不得被新增代码调用。
 
 #### 21.5.4 `src/sub_agent_ccr_renderer.py`
 
