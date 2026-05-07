@@ -3,7 +3,7 @@
 import os
 import pytest
 
-from code880web.hub.registry import ProjectRegistry
+from hy127web.hub.registry import ProjectRegistry
 
 
 @pytest.fixture

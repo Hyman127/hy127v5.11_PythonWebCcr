@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = $ProjectRoot.TrimEnd('\')
 
-$GlobalDir    = "$env:LOCALAPPDATA\Code880Web"
+$GlobalDir    = "$env:LOCALAPPDATA\Hy127Web"
 $RuntimeFile  = "$GlobalDir\hub_runtime.json"
 $InstallFile  = "$GlobalDir\install.json"
 $TokenDir     = "$GlobalDir\keys"
@@ -20,10 +20,10 @@ if (-not (Test-Path $InstallFile)) {
 }
 $install = Get-Content $InstallFile -Raw -Encoding UTF8 | ConvertFrom-Json
 
-# Developer checkout override: prefer this folder when it contains .venv + code880web.
+# Developer checkout override: prefer this folder when it contains .venv + hy127web.
 $LocalPython = Join-Path $ScriptRoot ".venv\Scripts\python.exe"
-$LocalHubApp = Join-Path $ScriptRoot "code880web\hub\app.py"
-$LocalWorkerApp = Join-Path $ScriptRoot "code880web\worker\app.py"
+$LocalHubApp = Join-Path $ScriptRoot "hy127web\hub\app.py"
+$LocalWorkerApp = Join-Path $ScriptRoot "hy127web\worker\app.py"
 if ((Test-Path $LocalPython) -and (Test-Path $LocalHubApp) -and (Test-Path $LocalWorkerApp)) {
     Write-Host "  [i] local dev workbench detected; using current folder"
     $ForceRestartHub = $true
@@ -37,7 +37,7 @@ if ((Test-Path $LocalPython) -and (Test-Path $LocalHubApp) -and (Test-Path $Loca
         python_path     = $LocalPython
         hub_app_path    = $LocalHubApp
         worker_app_path = $LocalWorkerApp
-        static_path     = (Join-Path $ScriptRoot "code880web\static")
+        static_path     = (Join-Path $ScriptRoot "hy127web\static")
         version         = "dev"
     }
 }
@@ -55,7 +55,7 @@ if (-not (Test-Path $install.hub_app_path)) {
 & $install.python_path -c "import fastapi, uvicorn, httpx, websockets" | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  [!] Web runtime dependencies are incomplete"
-    Write-Host "  [!] Run: uv pip install -r code880web\requirements.txt --python .\.venv\Scripts\python.exe --cache-dir .\.uv-cache"
+    Write-Host "  [!] Run: uv pip install -r hy127web\requirements.txt --python .\.venv\Scripts\python.exe --cache-dir .\.uv-cache"
     exit 1
 }
 
@@ -106,6 +106,9 @@ if (Test-Path $RuntimeFile) {
 if ($null -eq $hubUrl) {
     Write-Host '  [i] starting Hub...'
 
+    $env:HY127WEB_INSTALL_ROOT = $installRoot
+    $env:HY127WEB_PYTHON_PATH = $install.python_path
+    $env:HY127WEB_GLOBAL_DIR = $GlobalDir
     $env:CODE880WEB_INSTALL_ROOT = $installRoot
     $env:CODE880WEB_PYTHON_PATH = $install.python_path
     $env:CODE880WEB_GLOBAL_DIR = $GlobalDir
@@ -116,7 +119,7 @@ if ($null -eq $hubUrl) {
     Remove-Item $hubStdoutLog, $hubStderrLog -Force -ErrorAction SilentlyContinue
 
     Start-Process -FilePath $install.python_path `
-        -ArgumentList @("-m", "code880web.hub.app") `
+        -ArgumentList @("-m", "hy127web.hub.app") `
         -WorkingDirectory $installRoot `
         -RedirectStandardOutput $hubStdoutLog `
         -RedirectStandardError $hubStderrLog `

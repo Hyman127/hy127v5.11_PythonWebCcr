@@ -47,14 +47,14 @@ class InstallInfo:
 def read_install_info() -> InstallInfo:
     override_root = first_env("HY127WEB_INSTALL_ROOT", "CODE880WEB_INSTALL_ROOT")
     if override_root:
-        code880web_dir = os.path.join(override_root, "code880web")
+        hy127web_dir = os.path.join(override_root, "hy127web")
         python_path = first_env("HY127WEB_PYTHON_PATH", "CODE880WEB_PYTHON_PATH") or sys.executable
         return InstallInfo(
             install_root=override_root,
             python_path=python_path,
-            hub_app_path=os.path.join(code880web_dir, "hub", "app.py"),
-            worker_app_path=os.path.join(code880web_dir, "worker", "app.py"),
-            static_path=os.path.join(code880web_dir, "static"),
+            hub_app_path=os.path.join(hy127web_dir, "hub", "app.py"),
+            worker_app_path=os.path.join(hy127web_dir, "worker", "app.py"),
+            static_path=os.path.join(hy127web_dir, "static"),
             version="dev",
         )
 

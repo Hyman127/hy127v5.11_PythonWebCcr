@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from code880web.worker.services.git_service import GitService
+from hy127web.worker.services.git_service import GitService
 
 
 @pytest.fixture

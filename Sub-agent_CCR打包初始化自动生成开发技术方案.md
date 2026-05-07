@@ -1,9 +1,15 @@
 # Sub-agent + CCR 打包初始化自动生成开发技术方案
 
-> 版本：v3.1（Sub-agent + CCR 开箱即用定位修订稿）
+> 版本：v3.2（Hy127 架构适配稿 — 基于 git 基线 6160220 + 1cde8dc）
 > 日期：2026-05-07
-> 范围：`hy127v5.11_multi-orchestration_CCR` 的 Python 架构定位为 Claude Code `Sub-agent + CCR` 开箱即用工作台；`重新初始化 V1.24.ps1` 默认生成 HY127 受管理 Sub-agent 基础模板，初始化成功后由用户运行 `src\sub_agent_ccr_model_config.py` 配置 Sub-agent 角色与 AI 模型绑定。本方案只给开发落地边界和实现细节，不直接写入用户密钥或 CCR provider 配置。
-> 复核修订要点：`重新初始化 V1.24.ps1` 负责默认生成可用的 Claude agent 基础模板，跳过只作为 CI、纯 Python 教学环境或用户显式高级开关；模型/provider 绑定前置到 `ai_providers.py`、`ai_models_config.json` 和 `agent_role_binding.json`；用户通过 `src` 下 Python UI 配置后再渲染更新 `~/.claude/agents`，UI 必须能补齐缺失的受管理 agent；frontmatter 必须从第 1 行 `---` 开始；HY127 管理信息保留在 frontmatter 字段；`tools` 使用逗号分隔字符串；日志路径脱敏；新增 `.gitignore` 要求；同步逻辑保持版本比较、路径校验、原子写入和模板自检。
+> Git 基线：`6160220` (origin/master, fix: Hub 启动方式、路由顺序、Monaco 安全版本升级) + `1cde8dc` (feat: 引入 Sub-agent + CCR 模型绑定基础设施，含 ai_providers.py、ai_models_config.json)
+> 范围：本项目已从 `code880web` 重命名为 `hy127web`，已包含 `ai_providers.py`、`ai_models_config.json`。`重新初始化 V1.24.ps1` 默认生成 HY127 受管理 Sub-agent 基础模板，初始化成功后由用户运行 `src\sub_agent_ccr_model_config.py` 配置 Sub-agent 角色与 AI 模型绑定。本方案只给开发落地边界和实现细节，不直接写入用户密钥或 CCR provider 配置。
+> v3.2 修订要点：
+> - 目录重命名适配：`code880web` → `hy127web`，源码、路径、模块名、env var 全部修正；保留 `code880_session`/`code880_csrf` cookie 和 `Code880Web` 目录 fallback
+> - 落地清单修正：基于实际 git 基线标注每个文件存在状态；`必须重新初始化说明.md` 从"修改"更正为"新建"
+> - Git 基线说明：回退到 `6160220` + 新 commit `1cde8dc` 纳入 AI 基础设施
+> - 架构一致性：`pyproject.toml` testpaths 已改为 `hy127web/tests`，`.gitignore` 已含 `.claude/`
+> - 原 v3.1 复核修订要点仍适用：frontmatter 第 1 行 `---`；`model: inherit` 默认；`hy127_managed` 版本管理；tools 逗号分隔；日志路径脱敏；同步逻辑保持版本比较、路径校验、原子写入和模板自检
 
 ## 目录
 
@@ -26,7 +32,7 @@
 - [17. 验收标准](#17-验收标准)
 - [18. 推荐最终用户流程](#18-推荐最终用户流程)
 - [19. 推荐开发优先级](#19-推荐开发优先级)
-- [20. v3.1 落地清单](#20-v31-落地清单)
+- [20. v3.2 落地清单（基于 git 基线）](#20-v32-落地清单基于-git-基线-6160220--1cde8dc)
 - [21. 面向 DeepSeek 类实现模型的开发执行细节](#21-面向-deepseek-类实现模型的开发执行细节)
 - [22. 前置化模型绑定与 UI 配置层](#22-前置化模型绑定与-ui-配置层)
 - [23. 一句话方案](#23-一句话方案)
@@ -1109,48 +1115,60 @@ Select-String -Path ".\init_log.txt" -Pattern "CLAUDE AGENTS|Claude agents confi
 - 在模板中硬编码第三方 `model`。
 - 把 LangGraph 方案加入当前项目依赖。
 
-## 20. v3.1 落地清单
+## 20. v3.2 落地清单（基于 git 基线 6160220 + 1cde8dc）
 
-v3.1 建议按“重新初始化默认生成可用基础模板，再由模型绑定 UI 补齐和渲染”的顺序交付。Sub-agent + CCR 是项目开箱即用主流程，但 provider/model 绑定仍不能塞进初始化脚本或安装器。
+v3.2 在 v3.1 基础上做 Hy127 架构适配，修正 `code880web`→`hy127web` 目录重命名的影响，并基于实际 git 基线标注每个文件的真实存在状态。Sub-agent + CCR 是项目开箱即用主流程，provider/model 绑定仍不能塞进初始化脚本或安装器。
 
-必须新增：
+> 状态图例：✅ 已存在（含已修改） | 🆕 需新建 | ✏️ 需修改（文件已存在） | ⏸️ 暂不改动
 
-| 路径 | 内容 | 说明 |
+### 20.1 必须新增（🆕 当前均不存在）
+
+| 路径 | 内容 | 当前状态 | 说明 |
+|---|---|---|---|
+| `.claude_templates/agents/architect.md` | 架构分析 agent | 🆕 不存在 | `model: inherit`，只读为主 |
+| `.claude_templates/agents/implementer.md` | 代码实现 agent | 🆕 不存在 | `model: inherit`，允许写文件和跑局部命令 |
+| `.claude_templates/agents/reviewer.md` | 代码审查 agent | 🆕 不存在 | `model: inherit`，只输出审查报告 |
+| `.claude_templates/agents/tester.md` | 测试 agent | 🆕 不存在 | `model: inherit`，补测试和运行验证 |
+| `.claude_templates/agents/docs-writer.md` | 文档 agent | 🆕 不存在 | `model: inherit`，写中文说明和变更记录 |
+| `.claude_templates/README.md` | 模板说明 | 🆕 不存在 | 解释 frontmatter、`hy127_managed`、默认生成、高级跳过、UI 绑定流程 |
+| `agent_role_binding.json` | 角色绑定 | 🆕 不存在 | 默认全部 `inherit`，保存 UI 选择结果 |
+| `src/sub_agent_ccr_renderer.py` | 渲染逻辑 | 🆕 不存在 | 自动补齐缺失受管理 agent，只更新受管理 agent 的 `model` 字段 |
+| `src/sub_agent_ccr_model_config.py` | 配置 UI | 🆕 不存在 | 初始化成功后必经入口，写绑定、补齐 agent 并调用渲染器 |
+| `必须重新初始化说明.md` | 初始化说明文档 | 🆕 不存在 | 原 v3.1 误标为”修改”，实际文件不存在，需新建 |
+
+### 20.2 必须修改（✏️ 文件已存在，待改造）
+
+| 路径 | 当前状态 | 改动 | 验收点 |
+|---|---|---|---|
+| `ai_models_config.json` | ✅ 已存在（125行，commit `1cde8dc`） | 增加 provider/model 清单和推荐绑定 | 不保存 API Key，能表达 Claude 原生和 CCR 模式 |
+| `ai_providers.py` | ✅ 已存在（1406行，commit `1cde8dc`） | 增加读取、校验和展示辅助 | UI 不直接解析零散 JSON 字段 |
+| `重新初始化 V1.24.ps1` | ✅ 已存在 | 新增 `Install-ClaudeAgentTemplates` 等函数 | 默认生成 5 个受管理 agent，重复运行安全，冲突文件不覆盖，基础模板为 `inherit` |
+| `重新初始化 V1.24.ps1` | ✅ 已存在 | 主流程新增 `CLAUDE AGENTS CONFIGURATION` 阶段 | 失败只 WARN，不阻断 Python 初始化 |
+| `重新初始化 V1.24.ps1` | ✅ 已存在 | summary 新增 `Claude agents configuration` | `init_log.txt` 和最终汇总能看到结果；失败时提示开箱即用状态未完成 |
+| `一键安装说明.md` | ✅ 已存在 | 增加”运行重新初始化后生成模板，再运行配置 UI”的提示 | 安装器边界清晰，不误导用户；说明这是开箱即用主流程 |
+| `.gitignore` | ✅ 已存在（已含 `.claude/`、`.uv-cache/`、`.venv/` 等） | 补充 `init_log.txt`、`init_exit_trace.txt` 忽略项 | 运行期文件不被提交 |
+
+### 20.3 暂不修改（⏸️ 已存在，本阶段不动）
+
+| 路径 | 当前状态 | 原因 |
 |---|---|---|
-| `.claude_templates/agents/architect.md` | 架构分析 agent | `model: inherit`，只读为主 |
-| `.claude_templates/agents/implementer.md` | 代码实现 agent | `model: inherit`，允许写文件和跑局部命令 |
-| `.claude_templates/agents/reviewer.md` | 代码审查 agent | `model: inherit`，只输出审查报告 |
-| `.claude_templates/agents/tester.md` | 测试 agent | `model: inherit`，补测试和运行验证 |
-| `.claude_templates/agents/docs-writer.md` | 文档 agent | `model: inherit`，写中文说明和变更记录 |
-| `.claude_templates/README.md` | 模板说明 | 解释 frontmatter、`hy127_managed`、默认生成、高级跳过、UI 绑定流程 |
-| `agent_role_binding.json` | 角色绑定 | 默认全部 `inherit`，保存 UI 选择结果 |
-| `src/sub_agent_ccr_renderer.py` | 渲染逻辑 | 自动补齐缺失受管理 agent，只更新受管理 agent 的 `model` 字段 |
-| `src/sub_agent_ccr_model_config.py` | 配置 UI | 初始化成功后必经入口，写绑定、补齐 agent 并调用渲染器 |
+| `pyproject.toml` | ✅ 已存在（已修改 `testpaths` 为 `hy127web/tests`） | CCR 和 Claude Code 不属于 Python 项目依赖 |
+| `uv.lock` | ✅ 已存在 | 不新增 Python 包 |
+| `src/main.py` | ✅ 已存在（已修改 print 字符串） | 学员入口和 AI 模板生成无关 |
+| `src/一键安装卸载.py` | ✅ 已存在（已完成 `code880web`→`hy127web` 替换） | 第一阶段不让机器级安装器写用户级 Claude 配置 |
+| `重新初始化 V1.24.bat` | ✅ 已存在 | 仍只作为 PS1 启动器，无需改动 |
 
-必须修改：
+### 20.4 v3.2 适配变更摘要
 
-| 路径 | 改动 | 验收点 |
-|---|---|---|
-| `ai_models_config.json` | 增加 provider/model 清单和推荐绑定 | 不保存 API Key，能表达 Claude 原生和 CCR 模式 |
-| `ai_providers.py` | 增加读取、校验和展示辅助 | UI 不直接解析零散 JSON 字段 |
-| `重新初始化 V1.24.ps1` | 新增 `Install-ClaudeAgentTemplates` 等函数 | 默认生成 5 个受管理 agent，重复运行安全，冲突文件不覆盖，基础模板为 `inherit` |
-| `重新初始化 V1.24.ps1` | 主流程新增 `CLAUDE AGENTS CONFIGURATION` 阶段 | 失败只 WARN，不阻断 Python 初始化 |
-| `重新初始化 V1.24.ps1` | summary 新增 `Claude agents configuration` | `init_log.txt` 和最终汇总能看到结果；失败时提示开箱即用状态未完成 |
-| `必须重新初始化说明.md` | 增加默认 Claude agent 模板和模型 UI 说明 | 用户知道模板生成位置、高级跳过方式和后续绑定方式 |
-| `一键安装说明.md` | 增加“运行重新初始化后生成模板，再运行配置 UI”的提示 | 安装器边界清晰，不误导用户；说明这是开箱即用主流程 |
-| `.gitignore` | 忽略运行期文件 | 至少忽略 `init_log.txt`、`init_exit_trace.txt`、`.uv-cache/`、`.venv/` |
-
-暂不修改：
-
-| 路径 | 原因 |
+| 变更项 | 说明 |
 |---|---|
-| `pyproject.toml` | CCR 和 Claude Code 不属于 Python 项目依赖 |
-| `uv.lock` | 不新增 Python 包 |
-| `src/main.py` | 学员入口和 AI 模板生成无关 |
-| `src/一键安装卸载.py` | 第一阶段不让机器级安装器写用户级 Claude 配置 |
-| `重新初始化 V1.24.bat` | 仍只作为 PS1 启动器，无需改动 |
+| 目录重命名 | 一级目录 `code880web` → `hy127web`，源码导入、路径、模块名、env var 全部修正；保留 `code880_session`/`code880_csrf` cookie 名和 `Code880Web` 目录 fallback 向后兼容 |
+| Git 基线 | 回退到 `6160220` (origin/master)，新 commit `1cde8dc` 纳入 `ai_providers.py` + `ai_models_config.json` 基础设施 |
+| 落地清单修正 | `必须重新初始化说明.md` 实际不存在，从”修改”修正为”新建”；`.claude_templates/`、`agent_role_binding.json`、`src/sub_agent_ccr_*.py` 均未创建 |
+| `.gitignore` | 已新增 `.claude/` 忽略项 |
+| `pyproject.toml` | `testpaths` 已改为 `hy127web/tests` |
 
-v3.1 实施完成后，最小验收口径：
+v3.2 实施完成后，最小验收口径：
 
 1. 全新用户目录默认可生成 5 个 `model: inherit` 的 agent 基础模板。
 2. 已有无管理标记的同名文件不会被覆盖。
@@ -1224,7 +1242,7 @@ v3.1 实施完成后，最小验收口径：
 | `src/sub_agent_ccr_renderer.py` | 新增 | 补齐缺失受管理 agent，渲染 `model` 字段，原子写入，保护自定义文件 |
 | `src/sub_agent_ccr_model_config.py` | 新增 | 初始化成功后必经的模型绑定 UI |
 | `重新初始化 V1.24.ps1` | 修改 | 增加模板安装函数、summary 项、主流程调用，默认生成基础模板 |
-| `必须重新初始化说明.md` | 修改 | 增加基础模板同步和后续 UI 绑定说明 |
+| `必须重新初始化说明.md` | 新增 | 新建文件，说明基础模板同步和后续 UI 绑定流程 |
 | `一键安装说明.md` | 修改 | 提示运行重新初始化后再运行模型配置 UI |
 | `.gitignore` | 新增或修改 | 忽略 `init_log.txt`、`init_exit_trace.txt`、`.uv-cache/`、`.venv/` |
 
@@ -1636,7 +1654,9 @@ UI 不做：
 
 #### 21.6.1 `必须重新初始化说明.md`
 
-在“重新初始化会帮你做什么？”表格中增加一行：
+> ⚠️ v3.2 纠正：该文件当前**不存在**，需**新建**（v3.1 原方案误标为”修改已有文件”）。以下内容为新建该文件时应包含的完整章节。
+
+新建文件后，在”重新初始化会帮你做什么？”表格中增加一行：
 
 ```markdown
 | 默认生成 Claude Code Sub-agent 基础模板 | 放到 `%USERPROFILE%\.claude\agents`，默认 `model: inherit`，已有自定义 agent 不会被覆盖 |

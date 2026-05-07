@@ -89,7 +89,7 @@ class WorkerSupervisor:
 
         process = subprocess.Popen(
             [
-                python_path, "-m", "code880web.worker.app",
+                python_path, "-m", "hy127web.worker.app",
                 "--port", str(internal_port),
                 "--project-root", project_root,
             ],
