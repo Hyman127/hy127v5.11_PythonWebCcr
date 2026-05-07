@@ -525,7 +525,7 @@ function Start-DetachedVsCode {
     $command = ('"{0}" "{1}"' -f $VsCodePath, $WorkspaceRoot)
     $escapedCommand = $command.Replace('"', '""')
     $escapedWorkingDirectory = $WorkspaceRoot.Replace('"', '""')
-    $scriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("code880_launch_vscode_{0}.vbs" -f ([guid]::NewGuid().ToString('N')))
+    $scriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("hy127_launch_vscode_{0}.vbs" -f ([guid]::NewGuid().ToString('N')))
     $scriptBody = @"
 Set shell = CreateObject("WScript.Shell")
 Set env = shell.Environment("PROCESS")
@@ -885,7 +885,7 @@ try {
         Write-Log 'Running initialization test...'
         Write-Log '>>> BEGIN INITIALIZATION TEST OUTPUT <<<'
 
-        $testScript = Join-Path ([System.IO.Path]::GetTempPath()) ("code880_init_test_{0}_{1}.py" -f (Get-Random), (Get-Random))
+        $testScript = Join-Path ([System.IO.Path]::GetTempPath()) ("hy127_init_test_{0}_{1}.py" -f (Get-Random), (Get-Random))
         $testCode = @'
 import sys
 import platform

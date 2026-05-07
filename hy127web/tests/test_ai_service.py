@@ -1,6 +1,6 @@
 """Tests for Worker-side AI context filtering."""
 
-from code880web.worker.services.ai_service import AIService
+from hy127web.worker.services.ai_service import AIService
 
 
 def test_context_files_are_filtered_to_project_files(tmp_path):

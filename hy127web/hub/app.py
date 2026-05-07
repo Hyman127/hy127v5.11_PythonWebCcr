@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
     logger.info("Hub 已关闭")
 
 
-app = FastAPI(title="Code880 Hub", lifespan=lifespan)
+app = FastAPI(title="Hy127 Hub", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -123,7 +123,7 @@ async def exact_origin_cors(request: Request, call_next):
 
 @app.get("/api/hub/identity")
 async def hub_identity():
-    return {"service": "code880_hub", "version": hub_config.version}
+    return {"service": "hy127_hub", "version": hub_config.version}
 
 
 # ── Bootstrap auth ──

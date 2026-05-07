@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from code880web.worker.services.python_env_service import PythonEnvService
+from hy127web.worker.services.python_env_service import PythonEnvService
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from code880web.worker.services.run_config_service import RunConfigService
+from hy127web.worker.services.run_config_service import RunConfigService
 
 
 @pytest.fixture

@@ -13,6 +13,6 @@ missing = [name for name in required if importlib.util.find_spec(name) is None]
 if missing:
     print("Missing Python packages:", ", ".join(missing))
     print("Suggested:")
-    print("  python -m pip install -r code880web/requirements.txt pytest")
+    print("  python -m pip install -r hy127web/requirements.txt pytest")
     sys.exit(1)
 print("dev dependencies ok")

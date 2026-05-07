@@ -1,9 +1,9 @@
 """Download frontend vendor libraries for offline use.
 
 Run this script once after installation to enable offline mode:
-    python code880web/download_vendor.py
+    python hy127web/download_vendor.py
 
-Downloads Vue 3, Monaco Editor, and marked.js to code880web/static/vendor/.
+Downloads Vue 3, Monaco Editor, and marked.js to hy127web/static/vendor/.
 """
 
 import os
@@ -65,7 +65,7 @@ def download_file(url: str, dest: str):
 
 
 def main():
-    print("Code880 Web 前端资源下载")
+    print("Hy127 Web 前端资源下载")
     print(f"目标目录: {VENDOR_DIR}")
     print()
 

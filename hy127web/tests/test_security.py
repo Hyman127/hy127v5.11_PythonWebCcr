@@ -4,7 +4,7 @@ import os
 import tempfile
 import pytest
 
-from code880web.worker.services.security import validate_path
+from hy127web.worker.services.security import validate_path
 
 
 @pytest.fixture

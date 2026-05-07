@@ -26,4 +26,4 @@ dependencies = [
 
 [tool.pytest.ini_options]
 addopts = "-p no:cacheprovider"
-testpaths = ["code880web/tests"]
+testpaths = ["hy127web/tests"]

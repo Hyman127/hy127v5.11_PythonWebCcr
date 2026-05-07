@@ -1,6 +1,6 @@
 """Tests for Hub proxy helpers."""
 
-from code880web.hub.proxy import _first_cookie
+from hy127web.hub.proxy import _first_cookie
 
 
 def test_first_cookie_prefers_hy127_session():

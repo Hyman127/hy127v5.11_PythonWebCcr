@@ -1,6 +1,6 @@
 import json
 
-from code880web.hub.models_manager import ModelsManager
+from hy127web.hub.models_manager import ModelsManager
 
 
 def test_api_key_persists_outside_models_json(tmp_path):

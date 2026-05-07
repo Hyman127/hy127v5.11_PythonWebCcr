@@ -1749,12 +1749,12 @@ Start-Sleep -Milliseconds 800
     def _web_source_candidates(self):
         here = os.path.abspath(os.path.dirname(__file__))
         candidates = [
-            os.path.join(os.path.dirname(here), "code880web"),
-            os.path.join(os.path.dirname(sys.executable), "code880web"),
+            os.path.join(os.path.dirname(here), "hy127web"),
+            os.path.join(os.path.dirname(sys.executable), "hy127web"),
         ]
         meipass = getattr(sys, "_MEIPASS", "")
         if meipass:
-            candidates.insert(0, os.path.join(meipass, "code880web"))
+            candidates.insert(0, os.path.join(meipass, "hy127web"))
         return candidates
 
     def _find_web_source_dir(self):
@@ -1773,9 +1773,9 @@ Start-Sleep -Milliseconds 800
     def _deploy_web_workbench(self):
         source_dir = self._find_web_source_dir()
         if not source_dir:
-            raise RuntimeError("未找到 code880web 源目录，请确认安装包包含 Web 工作台组件")
+            raise RuntimeError("未找到 hy127web 源目录，请确认安装包包含 Web 工作台组件")
 
-        target_dir = os.path.join(self.dir, "code880web")
+        target_dir = os.path.join(self.dir, "hy127web")
         if os.path.normcase(os.path.abspath(source_dir)) == os.path.normcase(os.path.abspath(target_dir)):
             self._log(f"  [OK] Web 工作台已在安装目录: {target_dir}")
             return target_dir
@@ -2149,13 +2149,13 @@ you can use 'python', 'pip', 'uv' in any command prompt.
             global_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Code880Web")
             os.makedirs(global_dir, exist_ok=True)
 
-            code880web_dir = os.path.join(self.dir, "code880web")
+            hy127web_dir = os.path.join(self.dir, "hy127web")
             info = {
                 "install_root": self.dir,
                 "python_path": self.python_exe,
-                "hub_app_path": os.path.join(code880web_dir, "hub", "app.py"),
-                "worker_app_path": os.path.join(code880web_dir, "worker", "app.py"),
-                "static_path": os.path.join(code880web_dir, "static"),
+                "hub_app_path": os.path.join(hy127web_dir, "hub", "app.py"),
+                "worker_app_path": os.path.join(hy127web_dir, "worker", "app.py"),
+                "static_path": os.path.join(hy127web_dir, "static"),
                 "installed_at": _dt.now().isoformat(),
                 "version": "5.11",
             }

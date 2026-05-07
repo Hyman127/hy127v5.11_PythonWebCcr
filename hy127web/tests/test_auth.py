@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from code880web.hub.auth import AuthManager
-from code880web.hub.app import app, hub_config
+from hy127web.hub.auth import AuthManager
+from hy127web.hub.app import app, hub_config
 
 
 @pytest.fixture

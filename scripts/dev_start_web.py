@@ -55,7 +55,7 @@ def start_hub() -> subprocess.Popen:
         popen_kwargs = {"start_new_session": True}
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "code880web.hub.app"],
+        [sys.executable, "-m", "hy127web.hub.app"],
         cwd=PROJECT_ROOT,
         env=os.environ.copy(),
         **popen_kwargs,

@@ -53,7 +53,7 @@ __pycache__/
 git add .
 git commit -m "Initial commit"
 
-gh repo create Hyman127/hy127v5.11_PythonWeb --private --source=. --push
+gh repo create Hyman127/hy127v5.11_PythonWebCcr --private --source=. --push
 
 
 推送到远程
