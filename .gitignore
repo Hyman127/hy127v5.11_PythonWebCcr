@@ -12,3 +12,4 @@ state_pytest_tmp/
 pytest-cache-files-*/
 .trae/
 .lingma/
+.claude/
