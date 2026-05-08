@@ -1535,4 +1535,12 @@ def validate_binding(config, binding):
                 error=f"model {model!r} 不在 provider {provider!r} 的候选列表中",
             )
         return ValidationResult(ok=True, error="")
+    if mode == "web_model":
+        hub_model_id = binding.get("hub_model_id", "")
+        if not hub_model_id:
+            return ValidationResult(ok=False, error="web_model 模式缺少 hub_model_id")
+        import re as _re
+        if not _re.fullmatch(r"[0-9a-f]{8}", hub_model_id):
+            return ValidationResult(ok=False, error=f"hub_model_id {hub_model_id!r} 格式不符（需为 8 位 hex）")
+        return ValidationResult(ok=True, error="")
     return ValidationResult(ok=False, error=f"未知 mode: {mode!r}")
