@@ -16,7 +16,7 @@
     },
     "moonshot": {
       "display_name": "Moonshot/Kimi",
-      "base_url": "https://api.moonshot.cn/v1",
+      "base_url": "https://api.moonshot.ai/v1",
       "api_type": "openai_compatible",
       "env_key": "MOONSHOT_API_KEY",
       "model_labels": {
@@ -46,6 +46,16 @@
         "deepseek-reasoner"
       ]
     },
+    "glm": {
+      "display_name": "智谱/GLM",
+      "base_url": "https://api.z.ai/api/openai/v1",
+      "api_type": "openai_compatible",
+      "env_key": "ZHIPU_API_KEY",
+      "models": [
+        "glm-5.1",
+        "glm-4.7"
+      ]
+    },
     "qwen": {
       "display_name": "阿里云/通义千问",
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -60,12 +70,23 @@
         "qwen3.5-omni-plus",
         "qwen3.5-omni-flash",
         "qwen3-max-2026-01-23",
+        "qwen3-coder-next",
         "qwen3-coder-plus-2025-09-23",
         "qwq-plus-2025-03-05",
         "qwen-max-latest",
         "qwen-plus-latest",
         "qwen-turbo-latest",
         "qwen-long"
+      ]
+    },
+    "stepfun": {
+      "display_name": "阶跃星辰/StepFun",
+      "base_url": "https://api.stepfun.com/v1",
+      "api_type": "openai_compatible",
+      "env_key": "STEPFUN_API_KEY",
+      "models": [
+        "step-3.5-flash",
+        "step3"
       ]
     },
     "hunyuan": {
@@ -94,6 +115,16 @@
         "mimo-v2.5",
         "mimo-v2-pro",
         "mimo-v2-flash"
+      ]
+    },
+    "minimax": {
+      "display_name": "MiniMax",
+      "base_url": "https://api.minimax.io",
+      "api_type": "openai_compatible",
+      "env_key": "MINIMAX_API_KEY",
+      "models": [
+        "MiniMax-M2.7",
+        "MiniMax-M2.5"
       ]
     },
     "doubao": {
@@ -134,6 +165,11 @@
       "_注意": "base_url/env_key 仅供 AIProviderManager 调用层使用；CCR 鉴权由用户自行配置 CCR config，本仓库不写入任何 API Key",
       "models": [
         {
+          "id": "kimi-k2.6",
+          "label": "Ark Kimi K2.6（Coding Plan）",
+          "roles": ["architect", "implementer"]
+        },
+        {
           "id": "kimi-k2.5",
           "label": "Ark Kimi K2.5（Coding Plan）",
           "roles": ["architect", "implementer"]
@@ -142,6 +178,36 @@
           "id": "deepseek-v3.2",
           "label": "Ark DeepSeek V3.2（Coding Plan）",
           "roles": ["reviewer", "implementer"]
+        },
+        {
+          "id": "glm-5.1",
+          "label": "Ark GLM 5.1（Coding Plan）",
+          "roles": ["reviewer", "implementer"]
+        },
+        {
+          "id": "glm-4.7",
+          "label": "Ark GLM 4.7（Coding Plan）",
+          "roles": ["implementer", "tester"]
+        },
+        {
+          "id": "minimax-m2.7",
+          "label": "Ark MiniMax M2.7（Coding Plan）",
+          "roles": ["implementer"]
+        },
+        {
+          "id": "minimax-m2.5",
+          "label": "Ark MiniMax M2.5（Coding Plan）",
+          "roles": ["implementer", "tester"]
+        },
+        {
+          "id": "doubao-seed-2.0-code",
+          "label": "Ark Doubao Seed 2.0 Code（Coding Plan）",
+          "roles": ["implementer"]
+        },
+        {
+          "id": "doubao-seed-2.0-pro",
+          "label": "Ark Doubao Seed 2.0 Pro（Coding Plan）",
+          "roles": ["implementer", "architect"]
         },
         {
           "id": "doubao-seed-code-preview-latest",
