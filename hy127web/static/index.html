@@ -318,7 +318,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <template v-if="hasRunnable">
             <select class="run-select" v-model="selectedEntrypoint" v-if="entrypoints.length > 0">
               <option value="">当前文件</option>
-              <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}</option>
+              <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}<template v-if="ep.kind"> — {{ ep.kind }}</template></option>
             </select>
             <span class="web-service-status" :class="{running: isRunning}" :title="isRunning ? 'WEB服务运行中' : 'WEB服务已停止'"></span>
             <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; WEB服务<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
@@ -1597,19 +1597,28 @@ createApp({
     }
 
     // ── Run ──
+    function _isRunnable(path) {
+      if (!path) return false;
+      const ext = path.split('.').pop().toLowerCase();
+      return ext === 'py' || ext === 'bat' || ext === 'ps1';
+    }
+    function _runCmd(program) {
+      const ext = program.split('.').pop().toLowerCase();
+      if (ext === 'bat') return `> cmd.exe /c ${program}`;
+      if (ext === 'ps1') return `> powershell -File ${program}`;
+      return `> python ${program}`;
+    }
     async function runFile() {
       const program = selectedEntrypoint.value || activeFile.value?.path;
-      if (!program) {
-        if (activeFile.value?.extension !== '.py') {
-          addTerminalLine('未找到可运行文件。请打开 .py 文件，或在项目根放置 main.py / app.py。\n', 'info');
-          showTerminal.value = true;
-        }
+      if (!program || !_isRunnable(program)) {
+        addTerminalLine('未找到可运行文件。请选择入口点，或打开 .py / .bat / .ps1 文件。\n', 'info');
+        showTerminal.value = true;
         return;
       }
 
       showTerminal.value = true;
       terminalLines.value = [];
-      addTerminalLine(`> python ${program}\n`, 'cmd');
+      addTerminalLine(`$ ${_runCmd(program)}\n`, 'cmd');
 
       try {
         const resp = await apiFetch(`${wsBase.value}/run`, {

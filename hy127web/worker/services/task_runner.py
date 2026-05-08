@@ -43,8 +43,9 @@ class TaskRunner:
     async def start_run(self, file_rel_path: str, args: list[str] | None = None) -> str:
         if not validate_path(self.project_root, file_rel_path):
             raise ValueError("路径不合法")
-        if not file_rel_path.endswith(".py"):
-            raise ValueError("只能运行 .py 文件")
+        ext = Path(file_rel_path).suffix.lower()
+        if ext not in (".py", ".bat", ".ps1"):
+            raise ValueError("只能运行 .py / .bat / .ps1 文件")
 
         target = Path(self.project_root) / file_rel_path
         if not target.exists():
@@ -54,7 +55,6 @@ class TaskRunner:
             raise RuntimeError("已有任务运行中，请先停止")
 
         run_id = uuid.uuid4().hex[:8]
-        python_path = self.detect_python()
 
         env = os.environ.copy()
         if sys.platform == "win32":
@@ -63,21 +63,48 @@ class TaskRunner:
             venv_bin = os.path.join(self.project_root, ".venv", "bin")
         if os.path.isdir(venv_bin):
             env["PATH"] = f"{venv_bin}{os.pathsep}{env.get('PATH', '')}"
-        env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
-        env["PYTHONPATH"] = self.project_root
 
         cmd_args = args or []
         popen_kwargs = build_popen_kwargs()
-        process = await asyncio.create_subprocess_exec(
-            python_path, "-u", str(target), *cmd_args,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=self.project_root,
-            env=env,
-            **popen_kwargs,
-        )
+
+        if ext == ".bat":
+            env["HY127WEB_INSTALL_ROOT"] = self.project_root
+            env["HY127WEB_PYTHON_PATH"] = self.detect_python()
+            env["HY127WEB_GLOBAL_DIR"] = os.path.join(self.project_root, ".web-workbench", "global")
+            process = await asyncio.create_subprocess_exec(
+                "cmd.exe", "/c", str(target), *cmd_args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=self.project_root,
+                env=env,
+                **popen_kwargs,
+            )
+        elif ext == ".ps1":
+            process = await asyncio.create_subprocess_exec(
+                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(target), *cmd_args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=self.project_root,
+                env=env,
+                **popen_kwargs,
+            )
+        else:
+            python_path = self.detect_python()
+            env["PYTHONUNBUFFERED"] = "1"
+            env["PYTHONPATH"] = self.project_root
+            process = await asyncio.create_subprocess_exec(
+                python_path, "-u", str(target), *cmd_args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=self.project_root,
+                env=env,
+                **popen_kwargs,
+            )
 
         runs_dir = self._runs_dir()
         os.makedirs(runs_dir, exist_ok=True)

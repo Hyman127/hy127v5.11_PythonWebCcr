@@ -2,7 +2,11 @@ import json
 import os
 from pathlib import Path
 
-KNOWN_ENTRIES = ["main.py", "src/main.py", "app.py", "src/app.py", "run.py"]
+KNOWN_ENTRIES = [
+    "启动Web工作台.bat",
+    "启动Web工作台.ps1",
+    "main.py", "src/main.py", "app.py", "src/app.py", "run.py",
+]
 
 
 def discover_entrypoints(project_root: str) -> list[dict]:
@@ -27,10 +31,13 @@ def discover_entrypoints(project_root: str) -> list[dict]:
         if full.exists():
             already = any(r["path"] == entry for r in results)
             if not already:
+                ext = Path(entry).suffix.lower()
+                kind = "web服务启动脚本" if ext == ".bat" else "Python 入口"
                 results.append({
                     "name": entry,
                     "path": entry,
                     "source": "auto",
+                    "kind": kind,
                 })
 
     return results
