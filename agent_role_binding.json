@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "updated_at": null,
+  "agents": {
+    "architect":   { "mode": "inherit", "model": "inherit" },
+    "implementer": { "mode": "inherit", "model": "inherit" },
+    "reviewer":    { "mode": "inherit", "model": "inherit" },
+    "tester":      { "mode": "inherit", "model": "inherit" },
+    "docs-writer": { "mode": "inherit", "model": "inherit" }
+  }
+}
