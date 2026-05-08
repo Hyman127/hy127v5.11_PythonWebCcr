@@ -326,15 +326,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <span style="font-size:11px;color:var(--text-secondary);margin-right:4px" v-if="savingFile">保存中...</span>
           <span style="font-size:11px;color:var(--error);margin-right:4px;cursor:pointer" v-if="saveError" @click="saveError=''">{{ saveError }}</span>
           <button style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:2px 6px" @click="toggleGitPanel" :title="'Git 面板'">&#59212;</button>
-          <template v-if="hasRunnable">
-            <select class="run-select" v-model="selectedEntrypoint" v-if="entrypoints.length > 0">
-              <option value="">当前文件</option>
-              <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}<template v-if="ep.kind"> — {{ ep.kind }}</template></option>
-            </select>
-            <span class="web-service-status" :class="{running: isRunning}" :title="isRunning ? 'WEB服务运行中' : 'WEB服务已停止'"></span>
-            <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; WEB服务<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
-            <button class="stop-btn" v-if="isRunning" @click="stopRun">&#9632; 停止<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
-          </template>
+          <select class="run-select" v-model="selectedEntrypoint" v-if="entrypoints.length > 0">
+            <option value="">当前文件</option>
+            <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}<template v-if="ep.kind"> — {{ ep.kind }}</template></option>
+          </select>
+          <span class="web-service-status" :class="{running: isRunning}" :title="isRunning ? 'WEB服务运行中' : 'WEB服务已停止'"></span>
+          <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; WEB服务<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
+          <button class="stop-btn" v-if="isRunning" @click="stopRun">&#9632; 停止<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
         </div>
 
         <!-- Editor / Preview -->
