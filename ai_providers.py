@@ -1055,13 +1055,22 @@ class AIProviderManager:
                     if cfg.get("env_key"):
                         merged["env_key"] = cfg["env_key"]
                     if "models" in cfg and isinstance(cfg["models"], list):
-                        merged["models"] = cfg["models"]
+                        merged["models"] = [
+                            m["id"] if isinstance(m, dict) and "id" in m else m
+                            for m in cfg["models"]
+                        ]
                     self.providers[pkey] = merged
                 else:
                     self.providers[pkey] = dict(builtin)
             for pkey, pdata in providers.items():
                 if pkey not in self.providers:
-                    self.providers[pkey] = pdata
+                    normalized = dict(pdata)
+                    if "models" in normalized and isinstance(normalized["models"], list):
+                        normalized["models"] = [
+                            m["id"] if isinstance(m, dict) and "id" in m else m
+                            for m in normalized["models"]
+                        ]
+                    self.providers[pkey] = normalized
         else:
             self.providers = {k: dict(v) for k, v in BUILTIN_PROVIDERS.items()}
             self.save_config()
@@ -1404,3 +1413,134 @@ API_PROVIDER_KEY_FROM_DISPLAY = {v: k for k, v in API_PROVIDER_DISPLAY.items()}
 API_PROVIDER_DEFAULTS = {
     k: (v["base_url"], v["models"]) for k, v in BUILTIN_PROVIDERS.items()
 }
+
+
+# ═══════════════════════════════════════════════════════════
+# CCR Sub-agent 绑定层 (Sub-agent + CCR 配置层)
+# 仅供 sub_agent_ccr_renderer.py / sub_agent_ccr_model_config.py 使用。
+# 不调用 ai_providers.py 中任何密钥解析或环境变量写入函数。
+# ═══════════════════════════════════════════════════════════
+
+from collections import namedtuple as _namedtuple
+
+ValidationResult = _namedtuple("ValidationResult", ["ok", "error"])
+
+
+def load_models_config(path):
+    """加载 ai_models_config.json，保留 model 对象原始格式（含 label/roles）。"""
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_agent_bindings(path):
+    """加载 agent_role_binding.json；文件不存在时返回空 dict。"""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_agent_bindings(path, data):
+    """原子写入 agent_role_binding.json（tmp + rename）。"""
+    tmp = str(path) + ".hy127.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    os.replace(tmp, str(path))
+
+
+def list_route_options(config):
+    """返回所有 provider/model 候选项的平面列表，供 CCR 绑定 UI 使用。
+
+    每项格式::
+
+        {
+            'provider': str,
+            'model_id': str,
+            'label': str,
+            'requires_ccr': bool,
+            'roles': list[str],
+        }
+
+    models 支持字符串列表（现有 provider）和对象列表（含 id/label/roles 的 dict）。
+    对象列表中的 label 优先，其次用 model_labels 字典，最后回退到"model_id（display_name）"。
+    """
+    options = []
+    providers = config.get("providers", {})
+    for pkey, pdata in providers.items():
+        requires_ccr = bool(pdata.get("requires_ccr", False))
+        model_labels = pdata.get("model_labels", {})
+        display_name = pdata.get("display_name", pkey)
+        for m in pdata.get("models", []):
+            if isinstance(m, dict):
+                model_id = m.get("id", "")
+                if not model_id:
+                    continue
+                label = m.get("label") or model_labels.get(model_id) or f"{model_id}（{display_name}）"
+                roles = list(m.get("roles") or [])
+            else:
+                model_id = str(m)
+                label = model_labels.get(model_id) or f"{model_id}（{display_name}）"
+                roles = []
+            options.append({
+                "provider": pkey,
+                "model_id": model_id,
+                "label": label,
+                "requires_ccr": requires_ccr,
+                "roles": roles,
+            })
+    return options
+
+
+def validate_binding(config, binding):
+    """校验 binding dict 是否在 config 中有对应的 provider/model。
+
+    Parameters
+    ----------
+    config : dict
+        由 load_models_config() 返回的原始配置。
+    binding : dict
+        形如 ``{'mode': 'ccr', 'provider': 'ark_coding_plan', 'model': 'kimi-k2.5'}``。
+
+    Returns
+    -------
+    ValidationResult(ok=bool, error=str)
+    """
+    mode = binding.get("mode", "inherit")
+    if mode == "inherit":
+        return ValidationResult(ok=True, error="")
+    if mode == "native":
+        if not binding.get("model", ""):
+            return ValidationResult(ok=False, error="native 模式必须指定 model")
+        return ValidationResult(ok=True, error="")
+    if mode == "ccr":
+        provider = binding.get("provider", "")
+        model = binding.get("model", "")
+        if not provider:
+            return ValidationResult(ok=False, error="ccr 模式必须指定 provider")
+        if not model:
+            return ValidationResult(ok=False, error="ccr 模式必须指定 model")
+        providers = config.get("providers", {})
+        if provider not in providers:
+            return ValidationResult(ok=False, error=f"provider {provider!r} 不在配置中")
+        pdata = providers[provider]
+        model_ids = [
+            m["id"] if isinstance(m, dict) and "id" in m else str(m)
+            for m in pdata.get("models", [])
+        ]
+        if model not in model_ids:
+            return ValidationResult(
+                ok=False,
+                error=f"model {model!r} 不在 provider {provider!r} 的候选列表中",
+            )
+        return ValidationResult(ok=True, error="")
+    if mode == "web_model":
+        hub_model_id = binding.get("hub_model_id", "")
+        if not hub_model_id:
+            return ValidationResult(ok=False, error="web_model 模式缺少 hub_model_id")
+        import re as _re
+        if not _re.fullmatch(r"[0-9a-f]{8}", hub_model_id):
+            return ValidationResult(ok=False, error=f"hub_model_id {hub_model_id!r} 格式不符（需为 8 位 hex）")
+        return ValidationResult(ok=True, error="")
+    return ValidationResult(ok=False, error=f"未知 mode: {mode!r}")

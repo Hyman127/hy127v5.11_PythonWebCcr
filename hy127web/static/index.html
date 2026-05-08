@@ -138,6 +138,39 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .runtime-item { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 5px 6px; font-size: 11px; }
 .runtime-item .state { color: var(--text-secondary); white-space: nowrap; }
 
+/* ── Sub-agent panel ── */
+.subagent-panel { display: flex; flex-direction: column; height: 100%; }
+.subagent-header { height: 34px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border-color); gap: 8px; flex-shrink: 0; }
+.subagent-header .spacer { flex: 1; }
+.subagent-header button { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.subagent-header button:hover { color: var(--text-bright); }
+.ccr-status { font-size: 11px; border: 1px solid var(--border-color); border-radius: 3px; padding: 1px 6px; }
+.ccr-status.ok { color: var(--success); border-color: var(--success); }
+.ccr-status.warn { color: var(--warning); border-color: var(--warning); }
+.subagent-body { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.subagent-warn { background: rgba(204,167,0,0.1); border: 1px solid var(--warning); color: var(--warning); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
+.subagent-bindings { display: flex; flex-direction: column; gap: 4px; }
+.subagent-row { display: flex; align-items: center; gap: 6px; }
+.subagent-name { font-size: 12px; color: var(--text-secondary); width: 90px; flex-shrink: 0; }
+.subagent-select { flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 3px 5px; font-size: 11px; min-width: 0; }
+.subagent-current { font-size: 11px; }
+.section-label { color: var(--text-secondary); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 4px; }
+.subagent-rendered-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+.subagent-model-badge { color: var(--success); font-size: 10px; background: rgba(78,201,176,0.1); border: 1px solid rgba(78,201,176,0.3); border-radius: 3px; padding: 1px 5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subagent-empty { color: var(--text-secondary); font-size: 11px; }
+.subagent-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.subagent-loading { color: var(--text-secondary); font-size: 12px; padding: 12px 0; }
+.subagent-error { color: var(--error); font-size: 11px; }
+.subagent-footer { padding: 8px 12px; border-top: 1px solid var(--border-color); display: flex; gap: 6px; flex-shrink: 0; }
+.subagent-footer button { background: var(--accent); border: none; color: #fff; padding: 4px 14px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.subagent-footer button.secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+.subagent-footer button:disabled { opacity: 0.5; cursor: not-allowed; }
+.subagent-result { padding: 6px 12px; border-top: 1px solid var(--border-color); font-size: 11px; }
+.subagent-result .ok { color: var(--success); }
+.subagent-result .warn { color: var(--warning); }
+.subagent-ok { color: var(--success); margin-top: 3px; }
+.top-bar button.active { background: var(--bg-active); color: var(--text-bright); }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-bg); }
@@ -232,7 +265,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
       <span class="logo">Code880</span>
       <span class="project-name">{{ projectName }}</span>
       <span class="spacer"></span>
-      <button @click="toggleAI">{{ showAI ? '隐藏 AI' : '显示 AI' }}</button>
+      <button @click="toggleRightPanel('ai')" :class="{active: rightPanelView==='ai' && showRightPanel}">AI 对话</button>
+      <button @click="toggleRightPanel('subagent')" :class="{active: rightPanelView==='subagent' && showRightPanel}">Sub-agent</button>
       <button @click="goHome">项目列表</button>
     </div>
     <div class="main-area">
@@ -383,8 +417,72 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         </div>
       </div>
 
-      <!-- AI Panel -->
-      <div class="right-panel" :class="{collapsed: !showAI}">
+      <!-- Right Panel (AI / Sub-agent) -->
+      <div class="right-panel" :class="{collapsed: !showRightPanel}">
+        <!-- Sub-agent config view -->
+        <template v-if="rightPanelView === 'subagent'">
+          <div class="subagent-panel">
+            <div class="subagent-header">
+              Sub-agent 配置
+              <span class="spacer"></span>
+              <span class="ccr-status" :class="subagent.ccr.available ? 'ok' : 'warn'"
+                    :title="subagent.ccr.path || '未检测到 ccr 命令'">
+                CCR {{ subagent.ccr.available ? '● 可用' : '● 未检测' }}
+              </span>
+              <button @click="checkCcr" title="重新检测 CCR">↻</button>
+            </div>
+            <div class="subagent-body">
+              <div v-if="subagent.loading" class="subagent-loading">加载中...</div>
+              <div v-else-if="subagent.error" class="subagent-error">{{ subagent.error }}</div>
+              <template v-else>
+                <div v-if="!subagent.ccr.available" class="subagent-warn">
+                  ⚠ CCR 未检测到，CCR 路由模型保存后仍无法调用。请先安装 CCR，再重启 Claude Code。
+                </div>
+                <div class="subagent-bindings">
+                  <div v-for="name in subagentAgentNames" :key="name" class="subagent-row">
+                    <span class="subagent-name">{{ name }}</span>
+                    <select v-model="subagent.selections[name]" class="subagent-select">
+                      <option v-for="(c, i) in subagent.candidates" :key="i"
+                              :value="i" :disabled="!c.configured">
+                        {{ c.label }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="subagent-current">
+                  <div class="section-label">当前已渲染</div>
+                  <div v-for="a in subagent.rendered" :key="a.name" class="subagent-rendered-row">
+                    <span>{{ a.name }}</span>
+                    <span class="subagent-model-badge" :title="a.model">{{ a.model }}</span>
+                  </div>
+                  <div v-if="!subagent.rendered.length" class="subagent-empty">未检测到已渲染文件</div>
+                </div>
+                <div class="subagent-hint">
+                  选择 CCR 路由模型前，请先在「AI 对话 → 设置」中添加对应 Provider 模型。
+                </div>
+              </template>
+            </div>
+            <div class="subagent-footer">
+              <button @click="saveSubagentBinding" :disabled="subagent.saving">
+                {{ subagent.saving ? '保存中...' : '保存并渲染' }}
+              </button>
+              <button class="secondary" @click="refreshSubagentRendered">刷新结果</button>
+            </div>
+            <div class="subagent-result" v-if="subagent.result">
+              <span :class="subagent.result.ok ? 'ok' : 'warn'">
+                created={{ subagent.result.created.length }}
+                updated={{ subagent.result.updated.length }}
+                skipped={{ subagent.result.skipped.length }}
+                errors={{ subagent.result.errors.length }}
+              </span>
+              <div v-for="e in subagent.result.errors" :key="e" class="subagent-error">{{ e }}</div>
+              <div v-if="subagent.result.ok" class="subagent-ok">重启 Claude Code 后生效</div>
+            </div>
+          </div>
+        </template>
+
+        <!-- AI chat view -->
+        <template v-else>
         <div class="chat-header">
           AI 接入中心
           <span class="model-badge">{{ currentModelLabel }}</span>
@@ -526,6 +624,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             <button @click="sendChat" :disabled="aiStreaming || !chatInput.trim()">发送</button>
           </div>
         </div>
+        </template>
       </div>
     </div>
   </template>
@@ -655,7 +754,6 @@ createApp({
     let runWs = null;
 
     // AI
-    const showAI = ref(true);
     const chatHistory = ref([]);
     const chatInput = ref('');
     const aiStreaming = ref(false);
@@ -697,6 +795,127 @@ createApp({
     // File dialogs
     const fileDialog = reactive({ show: false, title: '', value: '', error: '', confirmLabel: '', node: null, mode: '' });
     const deleteConfirm = reactive({ show: false, title: '', message: '', node: null });
+
+    // Right panel view
+    const showRightPanel = ref(true);
+    const rightPanelView = ref('ai');
+    function toggleRightPanel(view) {
+      if (rightPanelView.value === view && showRightPanel.value) {
+        showRightPanel.value = false;
+      } else {
+        rightPanelView.value = view;
+        showRightPanel.value = true;
+        if (view === 'subagent' && !subagent.loaded) loadSubagentPanel();
+      }
+    }
+
+    // Sub-agent panel
+    const SUBAGENT_NAMES = ['architect', 'implementer', 'reviewer', 'tester', 'docs-writer'];
+    const subagentAgentNames = ref(SUBAGENT_NAMES);
+    const subagent = reactive({
+      loaded: false,
+      loading: false,
+      error: '',
+      ccr: { available: false, path: '' },
+      candidates: [],
+      selections: Object.fromEntries(SUBAGENT_NAMES.map(n => [n, 0])),
+      rendered: [],
+      saving: false,
+      result: null,
+    });
+
+    async function loadSubagentPanel() {
+      subagent.loading = true;
+      subagent.error = '';
+      try {
+        const [candResp, bindResp, rendResp] = await Promise.all([
+          apiFetch('/api/hub/subagent/candidates'),
+          apiFetch('/api/hub/subagent/binding'),
+          apiFetch('/api/hub/subagent/agents'),
+        ]);
+        if (!candResp.ok || !bindResp.ok || !rendResp.ok) throw new Error('API 请求失败');
+        const { candidates } = await candResp.json();
+        const binding = await bindResp.json();
+        const { agents: rendered } = await rendResp.json();
+
+        subagent.candidates = candidates;
+        subagent.rendered = rendered;
+
+        const currentAgents = binding.agents || {};
+        for (const name of SUBAGENT_NAMES) {
+          const b = currentAgents[name] || { mode: 'inherit' };
+          const idx = candidates.findIndex(c => {
+            if (c.mode !== b.mode) return false;
+            if (b.mode === 'web_model') return c.hub_model_id === b.hub_model_id;
+            if (b.mode === 'ccr') return c.provider === b.provider && c.model === b.model;
+            if (b.mode === 'native') return c.model === b.model;
+            return c.mode === 'inherit';
+          });
+          subagent.selections[name] = idx >= 0 ? idx : 0;
+        }
+        subagent.loaded = true;
+
+        // Check CCR
+        const ccrResp = await apiFetch('/api/hub/subagent/ccr/test', { method: 'POST', body: '{}' });
+        if (ccrResp.ok) subagent.ccr = await ccrResp.json();
+      } catch (e) {
+        subagent.error = e.message || 'Sub-agent 面板加载失败';
+      } finally {
+        subagent.loading = false;
+      }
+    }
+
+    async function checkCcr() {
+      const resp = await apiFetch('/api/hub/subagent/ccr/test', { method: 'POST', body: '{}' });
+      if (resp.ok) subagent.ccr = await resp.json();
+    }
+
+    async function saveSubagentBinding() {
+      subagent.saving = true;
+      subagent.result = null;
+      try {
+        const agents = {};
+        for (const name of SUBAGENT_NAMES) {
+          const c = subagent.candidates[subagent.selections[name]];
+          if (!c) { agents[name] = { mode: 'inherit' }; continue; }
+          if (c.mode === 'web_model') {
+            agents[name] = {
+              mode: 'web_model',
+              hub_model_id: c.hub_model_id,
+              provider: c.provider,
+              model: c.model,
+              ccr_format: c.ccr_format || '',
+            };
+          } else if (c.mode === 'ccr') {
+            agents[name] = { mode: 'ccr', provider: c.provider, model: c.model };
+          } else if (c.mode === 'native') {
+            agents[name] = { mode: 'native', model: c.model };
+          } else {
+            agents[name] = { mode: 'inherit', model: 'inherit' };
+          }
+        }
+        const resp = await apiFetch('/api/hub/subagent/binding', {
+          method: 'POST',
+          body: JSON.stringify({ agents }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          subagent.error = JSON.stringify(data.detail || data);
+          return;
+        }
+        subagent.result = data;
+        await refreshSubagentRendered();
+      } catch (e) {
+        subagent.error = e.message || '保存失败';
+      } finally {
+        subagent.saving = false;
+      }
+    }
+
+    async function refreshSubagentRendered() {
+      const resp = await apiFetch('/api/hub/subagent/agents');
+      if (resp.ok) subagent.rendered = (await resp.json()).agents;
+    }
 
     // Git panel
     const showGitPanel = ref(false);
@@ -1302,7 +1521,8 @@ createApp({
       streamBuffer.value = '';
       aiStreaming.value = false;
     }
-    function toggleAI() { showAI.value = !showAI.value; }
+    function toggleAI() { toggleRightPanel('ai'); }
+    const showAI = computed(() => showRightPanel.value && rightPanelView.value === 'ai');
     function scrollChat() {
       nextTick(() => {
         if (chatMessages.value) chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
@@ -1580,6 +1800,8 @@ createApp({
       currentView, workspaceId, projectName, projects, fileTree,
       openFiles, activeFile, entrypoints, selectedEntrypoint,
       showTerminal, terminalLines, terminalOutput, stdinInput, isRunning, currentRunId,
+      showRightPanel, rightPanelView, toggleRightPanel,
+      subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, refreshSubagentRendered,
       showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
       showModelSettings, showAdvancedModelSettings, modelForm, modelStatus,
       models, runtimes, currentProfileKey, thinkingProfile,

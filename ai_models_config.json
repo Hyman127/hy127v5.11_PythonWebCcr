@@ -19,6 +19,10 @@
       "base_url": "https://api.moonshot.cn/v1",
       "api_type": "openai_compatible",
       "env_key": "MOONSHOT_API_KEY",
+      "model_labels": {
+        "kimi-k2.5": "Kimi K2.5（Moonshot API）",
+        "kimi-k2.6": "Kimi K2.6（Moonshot API）"
+      },
       "models": [
         "kimi-k2.6",
         "kimi-k2.6-thinking",
@@ -119,6 +123,36 @@
         "gpt-5.3-codex",
         "gpt-5.3-codex-spark",
         "gpt-5.2"
+      ]
+    },
+    "ark_coding_plan": {
+      "display_name": "火山方舟 Coding Plan",
+      "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "api_type": "openai_compatible",
+      "env_key": "ARK_CODING_PLAN_API_KEY",
+      "requires_ccr": true,
+      "_注意": "base_url/env_key 仅供 AIProviderManager 调用层使用；CCR 鉴权由用户自行配置 CCR config，本仓库不写入任何 API Key",
+      "models": [
+        {
+          "id": "kimi-k2.5",
+          "label": "Ark Kimi K2.5（Coding Plan）",
+          "roles": ["architect", "implementer"]
+        },
+        {
+          "id": "deepseek-v3.2",
+          "label": "Ark DeepSeek V3.2（Coding Plan）",
+          "roles": ["reviewer", "implementer"]
+        },
+        {
+          "id": "doubao-seed-code-preview-latest",
+          "label": "Ark Doubao Seed Code Preview（Coding Plan）",
+          "roles": ["implementer"]
+        },
+        {
+          "id": "ark-code-latest",
+          "label": "Ark Code Latest（控制台统一管理，约 3-5 分钟生效）",
+          "roles": []
+        }
       ]
     }
   }

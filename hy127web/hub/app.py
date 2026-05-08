@@ -16,6 +16,7 @@ from .config import HubConfig, find_available_port, get_global_dir
 from .models_manager import ModelsManager
 from .proxy import proxy_http_to_worker, proxy_ws_to_worker
 from .registry import ProjectRegistry
+from .subagent_manager import SubAgentManager
 from .supervisor import WorkerSupervisor
 
 logger = logging.getLogger("hub")
@@ -25,11 +26,12 @@ auth: AuthManager | None = None
 registry: ProjectRegistry | None = None
 supervisor: WorkerSupervisor | None = None
 models_mgr: ModelsManager | None = None
+subagent_mgr: SubAgentManager | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global auth, registry, supervisor, models_mgr, hub_config
+    global auth, registry, supervisor, models_mgr, subagent_mgr, hub_config
 
     # port must already be set by main() before uvicorn starts;
     # lifespan must not re-probe, or it would diverge from uvicorn's listen port
@@ -61,6 +63,7 @@ async def lifespan(app: FastAPI):
     registry = ProjectRegistry(hub_config.db_path)
     supervisor = WorkerSupervisor(hub_config)
     models_mgr = ModelsManager(hub_config.models_path, hub_config.keys_dir)
+    subagent_mgr = SubAgentManager(models_mgr)
 
     runtime_path = hub_config.runtime_path
     with open(runtime_path, "w", encoding="utf-8") as f:
@@ -336,6 +339,60 @@ async def delete_model(model_id: str, request: Request):
 async def test_model(model_id: str, request: Request):
     auth.require_csrf(request)
     return await models_mgr.test_model(model_id)
+
+
+# ── Sub-agent 绑定管理 ──
+
+@app.get("/api/hub/subagent/status")
+async def subagent_status(request: Request):
+    auth.require_session(request)
+    return subagent_mgr.get_status()
+
+
+@app.get("/api/hub/subagent/candidates")
+async def subagent_candidates(request: Request):
+    auth.require_session(request)
+    return {"candidates": subagent_mgr.list_candidates()}
+
+
+@app.get("/api/hub/subagent/binding")
+async def subagent_get_binding(request: Request):
+    auth.require_session(request)
+    return subagent_mgr.get_binding()
+
+
+@app.post("/api/hub/subagent/binding")
+async def subagent_save_binding(request: Request):
+    auth.require_csrf(request)
+    body = await request.json()
+    agents = body.get("agents")
+    if not isinstance(agents, dict):
+        raise HTTPException(400, "缺少 agents 字段")
+
+    errors = subagent_mgr.validate_agents(agents)
+    if errors:
+        raise HTTPException(400, {"errors": errors})
+
+    result = subagent_mgr.save_and_render(agents)
+    return {
+        "created": result.created,
+        "updated": result.updated,
+        "skipped": result.skipped,
+        "errors": result.errors,
+        "ok": result.ok,
+    }
+
+
+@app.get("/api/hub/subagent/agents")
+async def subagent_rendered_agents(request: Request):
+    auth.require_session(request)
+    return {"agents": subagent_mgr.list_rendered_agents()}
+
+
+@app.post("/api/hub/subagent/ccr/test")
+async def subagent_ccr_test(request: Request):
+    auth.require_csrf(request)
+    return subagent_mgr.detect_ccr()
 
 
 def _runtime_available(commands: list[str]) -> tuple[bool, str]:
