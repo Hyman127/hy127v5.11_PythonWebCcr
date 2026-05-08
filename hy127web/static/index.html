@@ -313,13 +313,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <span style="font-size:11px;color:var(--text-secondary);margin-right:4px" v-if="savingFile">保存中...</span>
           <span style="font-size:11px;color:var(--error);margin-right:4px;cursor:pointer" v-if="saveError" @click="saveError=''">{{ saveError }}</span>
           <button style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:2px 6px" @click="toggleGitPanel" :title="'Git 面板'">&#59212;</button>
-          <template v-if="activeFile?.extension === '.py'">
-            <select class="run-select" v-model="selectedEntrypoint">
+          <template v-if="hasRunnable">
+            <select class="run-select" v-model="selectedEntrypoint" v-if="entrypoints.length > 0">
               <option value="">当前文件</option>
               <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}</option>
             </select>
-            <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; 运行</button>
-            <button class="stop-btn" v-if="isRunning" @click="stopRun">&#9632; 停止</button>
+            <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; 启动<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
+            <button class="stop-btn" v-if="isRunning" @click="stopRun">&#9632; 停止<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
           </template>
         </div>
 
@@ -1187,6 +1187,7 @@ createApp({
     });
 
     const wsBase = computed(() => `/api/workspaces/${workspaceId.value}`);
+    const hasRunnable = computed(() => !!workspaceId.value);
 
     // ── Init ──
     onMounted(async () => {
@@ -1213,8 +1214,9 @@ createApp({
     });
 
     function onGlobalKey(e) {
-      if ((e.key === 'F5' || (e.ctrlKey && e.key === 'F5')) && activeFile.value?.extension === '.py') {
+      if ((e.key === 'F5' || (e.ctrlKey && e.key === 'F5'))) {
         e.preventDefault();
+        if (!hasRunnable.value) return;
         if (isRunning.value) stopRun(); else runFile();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -1594,7 +1596,13 @@ createApp({
     // ── Run ──
     async function runFile() {
       const program = selectedEntrypoint.value || activeFile.value?.path;
-      if (!program) return;
+      if (!program) {
+        if (activeFile.value?.extension !== '.py') {
+          addTerminalLine('未找到可运行文件。请打开 .py 文件，或在项目根放置 main.py / app.py。\n', 'info');
+          showTerminal.value = true;
+        }
+        return;
+      }
 
       showTerminal.value = true;
       terminalLines.value = [];
@@ -2001,7 +2009,7 @@ createApp({
 
     return {
       currentView, workspaceId, projectName, projects, fileTree,
-      openFiles, activeFile, entrypoints, selectedEntrypoint,
+      openFiles, activeFile, entrypoints, selectedEntrypoint, hasRunnable,
       showTerminal, terminalLines, terminalOutput, stdinInput, isRunning, currentRunId,
       showRightPanel, rightPanelView, toggleRightPanel,
       subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, wizardAllInherit, wizardCcrPreferred, wizardApplyAll, wizardCopyCmd, refreshSubagentRendered,
