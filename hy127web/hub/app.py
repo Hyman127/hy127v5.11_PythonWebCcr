@@ -395,6 +395,100 @@ async def subagent_ccr_test(request: Request):
     return subagent_mgr.detect_ccr()
 
 
+# ── Phase W4: 向导组合端点 ──
+
+@app.get("/api/hub/subagent/init-status")
+async def subagent_init_status(request: Request):
+    auth.require_session(request)
+    return SubAgentManager.get_init_status()
+
+
+@app.post("/api/hub/subagent/ccr/config")
+async def subagent_ccr_config(request: Request):
+    auth.require_csrf(request)
+    body = await request.json()
+    provider = body.get("provider", "").strip()
+    if not provider:
+        raise HTTPException(400, "缺少 provider 字段")
+    set_as_default = bool(body.get("set_as_default", False))
+    try:
+        result = subagent_mgr.write_ccr_config(provider, set_as_default)
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"写入 CCR config 失败: {e}")
+
+
+@app.post("/api/hub/subagent/ccr/restart")
+async def subagent_ccr_restart(request: Request):
+    auth.require_csrf(request)
+    return SubAgentManager.restart_ccr(models_manager=models_mgr)
+
+
+@app.post("/api/hub/subagent/apply-all")
+async def subagent_apply_all(request: Request):
+    """向导「一键应用」组合端点：保存绑定+渲染 → 写 CCR config → 重启 CCR。"""
+    auth.require_csrf(request)
+    body = await request.json()
+    agents = body.get("agents")
+    provider = body.get("provider", "").strip()
+    set_as_default = bool(body.get("set_as_default", False))
+
+    if not isinstance(agents, dict):
+        raise HTTPException(400, "缺少 agents 字段")
+
+    response_data = {
+        "binding": None,
+        "ccr_config": None,
+        "ccr_restart": None,
+        "errors": [],
+    }
+
+    # [1] 校验 + 保存绑定 + 渲染
+    step1_errors = subagent_mgr.validate_agents(agents)
+    if step1_errors:
+        response_data["errors"] = [f"[1] 校验失败: {e}" for e in step1_errors]
+        return response_data
+
+    try:
+        result = subagent_mgr.save_and_render(agents)
+        response_data["binding"] = {
+            "created": result.created,
+            "updated": result.updated,
+            "skipped": result.skipped,
+            "errors": result.errors,
+        }
+        if result.errors:
+            response_data["errors"].extend(f"[1] 渲染: {e}" for e in result.errors)
+            return response_data
+    except Exception as e:
+        response_data["errors"].append(f"[1] 保存/渲染失败: {e}")
+        return response_data
+
+    # [2] 写 CCR config（无 provider 或 ccr 不可用则跳过）
+    if provider:
+        ccr = subagent_mgr.detect_ccr()
+        if ccr["available"]:
+            try:
+                ccr_result = subagent_mgr.write_ccr_config(provider, set_as_default)
+                response_data["ccr_config"] = ccr_result
+            except Exception as e:
+                response_data["errors"].append(f"[2] 写 CCR config 失败: {e}")
+                return response_data
+        else:
+            response_data["ccr_config"] = {"written": False, "reason": "CCR 不可用"}
+
+    # [3] 重启 CCR
+    if response_data["ccr_config"] and response_data["ccr_config"].get("written"):
+        restart_result = SubAgentManager.restart_ccr(models_manager=models_mgr)
+        response_data["ccr_restart"] = restart_result
+        if not restart_result["ok"]:
+            response_data["errors"].append(f"[3] CCR 重启失败: {restart_result['output']}")
+
+    return response_data
+
+
 def _runtime_available(commands: list[str]) -> tuple[bool, str]:
     for cmd in commands:
         path = shutil.which(cmd)

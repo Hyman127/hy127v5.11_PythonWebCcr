@@ -266,6 +266,187 @@ class SubAgentManager:
             )
         return result
 
+    # ── Phase W4: 初始化状态检查 ─────────────────────────────────────────────
+
+    @staticmethod
+    def get_init_status() -> dict:
+        """检测 ~/.claude/agents/ 中 hy127_managed 文件是否就绪。"""
+        agents = SubAgentManager.list_rendered_agents()
+        managed_count = len(agents)
+        ready = managed_count >= len(AGENT_NAMES)
+        if not ready:
+            return {
+                "ready": False,
+                "managed_count": managed_count,
+                "message": f"基础模板未就绪（{managed_count}/{len(AGENT_NAMES)}），请先运行重新初始化脚本",
+            }
+        return {
+            "ready": True,
+            "managed_count": managed_count,
+            "message": f"已就绪（{managed_count} 个 hy127_managed 文件）",
+        }
+
+    # ── Phase W4: CCR config 写入 ─────────────────────────────────────────────
+
+    def write_ccr_config(self, provider_id: str, set_as_default: bool = False) -> dict:
+        """备份 + 写入 ~/.claude-code-router/config.json。
+
+        - apiKey 只写 $ENV_KEY_NAME，不写真实 Key
+        - Router.default 若不存在则写入，若已有值且 set_as_default=True 则覆盖
+        - 写入前生成带时间戳备份，保留最近 3 份
+        """
+        import datetime
+        import shutil as _shutil
+        import glob as _glob
+
+        ccr_config_dir = Path.home() / ".claude-code-router"
+        config_path = ccr_config_dir / "config.json"
+
+        # 读取 ai_models_config.json 获取 provider 元数据
+        providers_cfg = self._config.get("providers", {})
+        pdata = providers_cfg.get(provider_id)
+        if not pdata:
+            raise ValueError(f"provider {provider_id!r} 不在 ai_models_config.json 中")
+
+        env_key = pdata.get("env_key", "")
+        if not env_key:
+            raise ValueError(f"provider {provider_id!r} 缺少 env_key，无法生成 $ENV_KEY_NAME")
+
+        base_url = pdata.get("base_url", "")
+        display_name = pdata.get("display_name", provider_id)
+        models_raw = pdata.get("models", [])
+        models = [
+            m["id"] if isinstance(m, dict) and "id" in m else str(m)
+            for m in models_raw
+        ]
+
+        # 读取现有 config
+        existing = {}
+        if config_path.exists():
+            try:
+                raw = config_path.read_text(encoding="utf-8")
+                existing = json.loads(raw) if raw.strip() else {}
+            except (json.JSONDecodeError, OSError):
+                existing = {}
+
+        # 备份
+        backup_path = ""
+        if config_path.exists():
+            ccr_config_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = str(ccr_config_dir / f"config.hy127.backup.{ts}.json")
+            _shutil.copy2(str(config_path), backup_path)
+
+            # 清理旧备份，保留最近 3 份
+            backups = sorted(
+                _glob.glob(str(ccr_config_dir / "config.hy127.backup.*.json"))
+            )
+            for old in backups[:-3]:
+                try:
+                    os.unlink(old)
+                except OSError:
+                    pass
+
+        # 构造 providers 列表（兼容旧格式 NAME/HOST/APIKEY/MODELS 和新格式 name/baseUrl/apiKey/models）
+        providers = existing.get("Providers", existing.get("providers", []))
+        # 查找是否已有此 provider
+        found = False
+        for p in providers:
+            p_name = p.get("name", p.get("NAME", ""))
+            if p_name == provider_id:
+                p["name"] = provider_id
+                p["baseUrl"] = base_url
+                p["apiKey"] = f"${env_key}"
+                p["models"] = models
+                # 清理旧格式字段
+                for old_key in ("NAME", "HOST", "APIKEY", "MODELS"):
+                    p.pop(old_key, None)
+                found = True
+                break
+
+        if not found:
+            providers.append({
+                "name": provider_id,
+                "baseUrl": base_url,
+                "apiKey": f"${env_key}",
+                "models": models,
+            })
+
+        # Router.default
+        router = existing.get("Router", existing.get("router", {}))
+        if isinstance(router, dict):
+            if "default" not in router or set_as_default:
+                first_model = models[0] if models else ""
+                router["default"] = f"{provider_id},{first_model}" if first_model else ""
+        else:
+            router = {"default": ""}
+
+        # 写入
+        new_config = {
+            "Providers": providers,
+            "Router": router,
+        }
+        ccr_config_dir.mkdir(parents=True, exist_ok=True)
+        tmp = str(config_path) + ".hy127.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(new_config, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        os.replace(tmp, str(config_path))
+
+        return {
+            "written": True,
+            "backup_path": backup_path,
+            "config_path": str(config_path),
+        }
+
+    # ── Phase W4: CCR 重启 ────────────────────────────────────────────────────
+
+    @staticmethod
+    def restart_ccr(models_manager=None) -> dict:
+        """从 ModelsManager 读取 Key，构造 env，subprocess 执行 ccr restart。
+
+        models_manager: ModelsManager 实例，用于读取 api_keys。若为 None 则尝试从全局获取。
+        """
+        ccr_path = shutil.which("ccr")
+        if not ccr_path:
+            return {"ok": False, "output": "ccr 命令不可用", "ccr_path": ""}
+
+        env = os.environ.copy()
+        if models_manager is not None:
+            # 从 ModelsManager 读取所有已配置模型的 Key，按 provider 聚合注入
+            provider_env_added = set()
+            for m in models_manager.list_models():
+                if not m.get("enabled"):
+                    continue
+                provider = m.get("provider", "")
+                env_key_name = m.get("env_key", "")
+                if not provider or not env_key_name or provider in provider_env_added:
+                    continue
+                key = models_manager.get_api_key(m["id"])
+                if key:
+                    env[env_key_name] = key
+                    provider_env_added.add(provider)
+
+        import subprocess
+        try:
+            proc = subprocess.run(
+                [ccr_path, "restart"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
+            )
+            ok = proc.returncode == 0
+            return {
+                "ok": ok,
+                "output": (proc.stdout + proc.stderr).strip()[:2000],
+                "ccr_path": ccr_path,
+            }
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "output": "ccr restart 超时", "ccr_path": ccr_path}
+        except Exception as e:
+            return {"ok": False, "output": str(e), "ccr_path": ccr_path}
+
     # ── 状态摘要 ─────────────────────────────────────────────────────────────
 
     def get_status(self) -> dict:

@@ -281,3 +281,137 @@ def test_get_status_structure(tmp_path, monkeypatch):
     assert "agents_count" in status
     assert "non_inherit_count" in status
     assert "rendered_count" in status
+
+
+# ── Phase W4：init-status ────────────────────────────────────────────────────
+
+def test_get_init_status_when_agents_dir_empty(tmp_path, monkeypatch):
+    """无 hy127_managed 文件时 ready=False。"""
+    agents_dir = tmp_path / "empty_agents"
+    agents_dir.mkdir()
+    monkeypatch.setenv("HY127_TEST_AGENTS_DIR", str(agents_dir))
+    status = SubAgentManager.get_init_status()
+    assert status["ready"] is False
+    assert status["managed_count"] == 0
+    assert "未就绪" in status["message"]
+
+
+def test_get_init_status_when_all_managed(tmp_path, monkeypatch):
+    """全部 5 个 hy127_managed 文件就绪时 ready=True。"""
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    monkeypatch.setenv("HY127_TEST_AGENTS_DIR", str(agents_dir))
+    for name in AGENT_NAMES:
+        (agents_dir / f"{name}.md").write_text(
+            f"---\nname: {name}\nhy127_managed: {name}-v1.0.0\nmodel: inherit\n---\nbody\n",
+            encoding="utf-8",
+        )
+    status = SubAgentManager.get_init_status()
+    assert status["ready"] is True
+    assert status["managed_count"] == 5
+
+
+def test_get_init_status_partial_ready(tmp_path, monkeypatch):
+    """仅有 3/5 文件时 ready=False。"""
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    monkeypatch.setenv("HY127_TEST_AGENTS_DIR", str(agents_dir))
+    for name in AGENT_NAMES[:3]:
+        (agents_dir / f"{name}.md").write_text(
+            f"---\nname: {name}\nhy127_managed: {name}-v1.0.0\nmodel: inherit\n---\nbody\n",
+            encoding="utf-8",
+        )
+    status = SubAgentManager.get_init_status()
+    assert status["ready"] is False
+    assert status["managed_count"] == 3
+
+
+# ── Phase W4：CCR config 写入 ─────────────────────────────────────────────────
+
+def test_write_ccr_config_creates_file(tmp_path, monkeypatch):
+    """write_ccr_config 应在测试目录中生成 config.json（覆盖 HOME）。"""
+    ccr_dir = tmp_path / "ccr"
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    ccr_dir.mkdir(parents=True, exist_ok=True)
+
+    mgr = _make_manager(tmp_path)
+    # ark_coding_plan 应在 ai_models_config.json 中
+    result = mgr.write_ccr_config("ark_coding_plan", set_as_default=False)
+
+    assert result["written"] is True
+    config_path = tmp_path / ".claude-code-router" / "config.json"
+    assert config_path.exists()
+
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    providers = data.get("Providers", data.get("providers", []))
+    ark = next((p for p in providers if p.get("name") == "ark_coding_plan"), None)
+    assert ark is not None
+    assert ark["apiKey"].startswith("$")
+    assert "ARK_CODING_PLAN_API_KEY" in ark["apiKey"]
+
+
+def test_write_ccr_config_creates_backup(tmp_path, monkeypatch):
+    """已存在 config.json 时写入前生成备份。"""
+    ccr_dir = tmp_path / ".claude-code-router"
+    ccr_dir.mkdir(parents=True, exist_ok=True)
+    config_path = ccr_dir / "config.json"
+    config_path.write_text('{"old": true}', encoding="utf-8")
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    mgr = _make_manager(tmp_path)
+    result = mgr.write_ccr_config("ark_coding_plan", set_as_default=False)
+
+    assert result["written"] is True
+    assert result["backup_path"] != ""
+    assert "config.hy127.backup." in result["backup_path"]
+    assert Path(result["backup_path"]).exists()
+
+
+def test_write_ccr_config_unknown_provider(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    mgr = _make_manager(tmp_path)
+    with pytest.raises(ValueError, match="不在 ai_models_config.json"):
+        mgr.write_ccr_config("nonexistent_provider_xyz")
+
+
+# ── Phase W4：CCR 重启 ────────────────────────────────────────────────────────
+
+def test_restart_ccr_no_ccr_binary(tmp_path, monkeypatch):
+    """当 ccr 命令不存在时返回 ok=False。"""
+    from hy127web.hub.subagent_manager import SubAgentManager as SM
+    # 清除 PATH 使 shutil.which 找不到 ccr
+    monkeypatch.setattr("shutil.which", lambda x: None)
+    result = SM.restart_ccr()
+    assert result["ok"] is False
+    assert "不可用" in result["output"]
+
+
+# ── Phase W4：apply-all 流程 ──────────────────────────────────────────────────
+
+def test_apply_all_without_ccr_writes_binding(tmp_path, monkeypatch):
+    """apply-all 在无 CCR 时应只完成 step [1] 保存绑定。"""
+    agents_dir = tmp_path / "test_agents"
+    monkeypatch.setenv("HY127_TEST_AGENTS_DIR", str(agents_dir))
+
+    mgr, model = _make_manager_with_model(tmp_path, provider="deepseek", model_id="deepseek-chat")
+    agents = {
+        "architect": {
+            "mode": "web_model",
+            "hub_model_id": model["id"],
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "ccr_format": "deepseek,deepseek-chat",
+        },
+        **{name: {"mode": "inherit", "model": "inherit"} for name in AGENT_NAMES if name != "architect"},
+    }
+
+    # 模拟调用 apply-all 的 step [1]
+    errors = mgr.validate_agents(agents)
+    assert errors == [], f"Validation errors: {errors}"
+    result = mgr.save_and_render(agents)
+    assert result.ok, f"Render errors: {result.errors}"
+    assert "architect" in result.created or "architect" in result.updated
+
+    # 验证绑定文件已持久化
+    binding = mgr.get_binding()
+    assert binding["agents"]["architect"]["mode"] == "web_model"

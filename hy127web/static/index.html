@@ -138,7 +138,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .runtime-item { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 5px 6px; font-size: 11px; }
 .runtime-item .state { color: var(--text-secondary); white-space: nowrap; }
 
-/* ── Sub-agent panel ── */
+/* ── Sub-agent wizard ── */
 .subagent-panel { display: flex; flex-direction: column; height: 100%; }
 .subagent-header { height: 34px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border-color); gap: 8px; flex-shrink: 0; }
 .subagent-header .spacer { flex: 1; }
@@ -149,10 +149,12 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .ccr-status.warn { color: var(--warning); border-color: var(--warning); }
 .subagent-body { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .subagent-warn { background: rgba(204,167,0,0.1); border: 1px solid var(--warning); color: var(--warning); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
+.subagent-info { background: rgba(78,201,176,0.08); border: 1px solid rgba(78,201,176,0.3); color: var(--success); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
 .subagent-bindings { display: flex; flex-direction: column; gap: 4px; }
 .subagent-row { display: flex; align-items: center; gap: 6px; }
 .subagent-name { font-size: 12px; color: var(--text-secondary); width: 90px; flex-shrink: 0; }
 .subagent-select { flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 3px 5px; font-size: 11px; min-width: 0; }
+.subagent-select:disabled { opacity: 0.5; cursor: not-allowed; }
 .subagent-current { font-size: 11px; }
 .section-label { color: var(--text-secondary); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 4px; }
 .subagent-rendered-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
@@ -169,6 +171,21 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .subagent-result .ok { color: var(--success); }
 .subagent-result .warn { color: var(--warning); }
 .subagent-ok { color: var(--success); margin-top: 3px; }
+/* wizard step indicators */
+.wizard-steps { display: flex; gap: 0; margin: 0 0 10px 0; }
+.wizard-step-dot { flex: 1; text-align: center; font-size: 10px; color: var(--text-secondary); padding: 4px 0; border-bottom: 2px solid var(--border-color); }
+.wizard-step-dot.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.wizard-step-dot.done { color: var(--success); border-bottom-color: var(--success); }
+.wizard-model-list { font-size: 11px; }
+.wizard-model-item { display: flex; justify-content: space-between; padding: 2px 0; }
+.wizard-model-item .check { color: var(--success); }
+.wizard-model-item .warn2 { color: var(--warning); }
+.wizard-cmd-box { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 10px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
+.wizard-cmd-box button { background: var(--accent); border: none; color: #fff; padding: 2px 10px; border-radius: 3px; cursor: pointer; font-size: 11px; }
+.wizard-progress-step { padding: 4px 0; font-size: 11px; }
+.wizard-progress-step .step-ok { color: var(--success); }
+.wizard-progress-step .step-err { color: var(--error); }
+.wizard-progress-step .step-pending { color: var(--text-secondary); }
 .top-bar button.active { background: var(--bg-active); color: var(--text-bright); }
 
 /* ── Scrollbar ── */
@@ -419,11 +436,12 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 
       <!-- Right Panel (AI / Sub-agent) -->
       <div class="right-panel" :class="{collapsed: !showRightPanel}">
-        <!-- Sub-agent config view -->
+        <!-- Sub-agent wizard -->
         <template v-if="rightPanelView === 'subagent'">
           <div class="subagent-panel">
             <div class="subagent-header">
-              Sub-agent 配置
+              Sub-agent 配置 [{{ subagent.wizardStep }}/4]
+              <span v-if="subagent.wizardStep < 4"> — {{ ['Provider 确认','角色绑定','应用中','完成'][subagent.wizardStep-1] }}</span>
               <span class="spacer"></span>
               <span class="ccr-status" :class="subagent.ccr.available ? 'ok' : 'warn'"
                     :title="subagent.ccr.path || '未检测到 ccr 命令'">
@@ -431,44 +449,140 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
               </span>
               <button @click="checkCcr" title="重新检测 CCR">↻</button>
             </div>
+
+            <!-- Step indicators -->
+            <div class="wizard-steps">
+              <div class="wizard-step-dot" :class="{ active: subagent.wizardStep===1, done: subagent.wizardStep>1 }">① Provider</div>
+              <div class="wizard-step-dot" :class="{ active: subagent.wizardStep===2, done: subagent.wizardStep>2 }">② 绑定</div>
+              <div class="wizard-step-dot" :class="{ active: subagent.wizardStep===3, done: subagent.wizardStep>3 }">③ 应用</div>
+              <div class="wizard-step-dot" :class="{ active: subagent.wizardStep===4 }">④ 完成</div>
+            </div>
+
             <div class="subagent-body">
               <div v-if="subagent.loading" class="subagent-loading">加载中...</div>
               <div v-else-if="subagent.error" class="subagent-error">{{ subagent.error }}</div>
-              <template v-else>
-                <div v-if="!subagent.ccr.available" class="subagent-warn">
-                  ⚠ CCR 未检测到，CCR 路由模型保存后仍无法调用。请先安装 CCR，再重启 Claude Code。
+
+              <!-- ── Step 1: Provider 确认 ── -->
+              <template v-else-if="subagent.wizardStep === 1">
+                <div :class="subagent.initStatus?.ready ? 'subagent-info' : 'subagent-warn'">
+                  基础模板状态：{{ subagent.initStatus?.ready ? '● 已就绪（' + subagent.initStatus.managed_count + ' 个 hy127_managed 文件）' : '○ 未就绪 → 请先运行"重新初始化"脚本' }}
+                </div>
+                <div class="section-label">已配置 Hub 模型</div>
+                <div class="wizard-model-list">
+                  <div v-for="m in subagent.configuredModels" :key="m.hub_model_id" class="wizard-model-item">
+                    <span>✓ {{ m.label?.replace('[已配置] ','') }}</span>
+                    <span class="check">{{ m.provider }} / {{ m.model }}</span>
+                  </div>
+                  <div v-if="!subagent.configuredModels.length" class="subagent-empty">暂无已配置模型</div>
+                </div>
+                <div class="subagent-hint">
+                  需要 CCR 路由的模型会在应用时自动写入 CCR config。<br>
+                  如需添加更多模型，请前往 <a href="#" @click.prevent="toggleRightPanel('ai')">模型管理</a>。
+                </div>
+                <div :class="subagent.ccr.available ? 'subagent-info' : 'subagent-warn'">
+                  CCR 状态：{{ subagent.ccr.available ? '● 可用（' + subagent.ccr.path + '）' : '○ 不可用 → 请先安装 CCR' }}
+                </div>
+              </template>
+
+              <!-- ── Step 2: 角色绑定 ── -->
+              <template v-else-if="subagent.wizardStep === 2">
+                <div class="subagent-row">
+                  <button class="secondary" style="font-size:11px;padding:2px 8px;margin-bottom:4px" @click="wizardAllInherit">一键默认方案：全 inherit</button>
+                  <button class="secondary" style="font-size:11px;padding:2px 8px;margin-bottom:4px" @click="wizardCcrPreferred" :disabled="!subagent.configuredModels.length">一键 CCR 首选</button>
                 </div>
                 <div class="subagent-bindings">
                   <div v-for="name in subagentAgentNames" :key="name" class="subagent-row">
                     <span class="subagent-name">{{ name }}</span>
                     <select v-model="subagent.selections[name]" class="subagent-select">
-                      <option v-for="(c, i) in subagent.candidates" :key="i"
-                              :value="i" :disabled="!c.configured">
-                        {{ c.label }}
-                      </option>
+                      <optgroup label="──── 继承 ────">
+                        <option v-for="(c, i) in subagent.inheritOptions" :key="'inh-'+i" :value="subagent.candidateIndex(c)">{{ c.label }}</option>
+                      </optgroup>
+                      <optgroup label="──── 已配置模型 ────">
+                        <option v-for="c in subagent.configuredModels" :key="'cfg-'+c.hub_model_id" :value="subagent.candidateIndex(c)">
+                          {{ c.label }}
+                        </option>
+                      </optgroup>
+                      <optgroup label="──── 候选（需先在模型管理页配置）────">
+                        <option v-for="c in subagent.unconfiguredModels" :key="'uncfg-'+c.provider+'-'+c.model" :value="subagent.candidateIndex(c)" disabled>
+                          {{ c.label }}
+                        </option>
+                      </optgroup>
                     </select>
                   </div>
                 </div>
-                <div class="subagent-current">
-                  <div class="section-label">当前已渲染</div>
-                  <div v-for="a in subagent.rendered" :key="a.name" class="subagent-rendered-row">
-                    <span>{{ a.name }}</span>
-                    <span class="subagent-model-badge" :title="a.model">{{ a.model }}</span>
-                  </div>
-                  <div v-if="!subagent.rendered.length" class="subagent-empty">未检测到已渲染文件</div>
+              </template>
+
+              <!-- ── Step 3: 执行进度 ── -->
+              <template v-else-if="subagent.wizardStep === 3">
+                <div class="wizard-progress-step">
+                  <span :class="subagent.applyResult?.ccr_restart ? 'step-ok' : subagent.applyError ? 'step-err' : 'step-pending'">
+                    [1] 保存绑定 + 渲染 agents
+                  </span>
+                  <span v-if="subagent.applyResult?.binding">
+                    ✓ created={{ subagent.applyResult.binding.created.length }}
+                    updated={{ subagent.applyResult.binding.updated.length }}
+                    skipped={{ subagent.applyResult.binding.skipped.length }}
+                  </span>
+                  <span v-else-if="subagent.applyError" class="step-err"> ✗</span>
+                  <span v-else> ⟳ 执行中...</span>
                 </div>
-                <div class="subagent-hint">
-                  选择 CCR 路由模型前，请先在「AI 对话 → 设置」中添加对应 Provider 模型。
+                <div class="wizard-progress-step">
+                  <span :class="subagent.applyResult?.ccr_restart ? 'step-ok' : (subagent.applyResult?.ccr_config ? 'step-ok' : subagent.applyError ? 'step-err' : 'step-pending')">
+                    [2] 写入 CCR config
+                  </span>
+                  <span v-if="subagent.applyResult?.ccr_config?.written">
+                    ✓ {{ subagent.applyResult.ccr_config.backup_path ? '已备份 + 写入' : '已写入' }}
+                  </span>
+                  <span v-else-if="subagent.applyResult?.ccr_config?.reason"> ⊘ {{ subagent.applyResult.ccr_config.reason }}</span>
+                  <span v-else-if="subagent.applyError" class="step-err"> ✗ {{ subagent.applyError }}</span>
+                  <span v-else-if="subagent.applyResult?.binding"> ⟳ 执行中...</span>
+                </div>
+                <div class="wizard-progress-step">
+                  <span :class="subagent.applyResult?.ccr_restart?.ok ? 'step-ok' : (subagent.applyResult?.ccr_restart ? 'step-err' : 'step-pending')">
+                    [3] 重启 CCR
+                  </span>
+                  <span v-if="subagent.applyResult?.ccr_restart?.ok"> ✓ 已重启</span>
+                  <span v-else-if="subagent.applyResult?.ccr_restart && !subagent.applyResult.ccr_restart.ok" class="step-err"> ✗ {{ subagent.applyResult.ccr_restart.output?.substring(0,80) }}</span>
+                  <span v-else-if="subagent.applyResult?.ccr_config"> ⟳ 执行中...</span>
+                </div>
+                <div v-if="subagent.applyResult?.errors?.length" class="subagent-warn" style="margin-top:8px">
+                  <div v-for="e in subagent.applyResult.errors" :key="e">{{ e }}</div>
                 </div>
               </template>
+
+              <!-- ── Step 4: 完成 ── -->
+              <template v-else-if="subagent.wizardStep === 4">
+                <div class="subagent-info">✓ Sub-agent 多模型绑定已就绪</div>
+                <div class="section-label">在终端运行以下命令启动 Claude Code</div>
+                <div class="wizard-cmd-box">
+                  <span>ccr code</span>
+                  <button @click="wizardCopyCmd">复制</button>
+                </div>
+                <div class="subagent-warn" style="margin-top:6px">
+                  ⚠ 请勿在外部终端手动执行 ccr restart，那样会绕过 Hub 的 env 注入（API Key 不可用）。
+                </div>
+                <div class="section-label" style="margin-top:8px">当前渲染结果</div>
+                <div v-for="a in subagent.rendered" :key="a.name" class="subagent-rendered-row">
+                  <span>{{ a.name }}</span>
+                  <span class="subagent-model-badge" :title="a.model">{{ a.model }}</span>
+                </div>
+                <div v-if="!subagent.rendered.length" class="subagent-empty">未检测到已渲染文件</div>
+              </template>
             </div>
+
+            <!-- Footer -->
             <div class="subagent-footer">
-              <button @click="saveSubagentBinding" :disabled="subagent.saving">
-                {{ subagent.saving ? '保存中...' : '保存并渲染' }}
-              </button>
-              <button class="secondary" @click="refreshSubagentRendered">刷新结果</button>
+              <button v-if="subagent.wizardStep === 1" class="secondary" @click="checkCcr">刷新</button>
+              <button v-if="subagent.wizardStep === 2" class="secondary" @click="subagent.wizardStep = 1">← 上一步</button>
+              <button v-if="subagent.wizardStep === 1" @click="subagent.wizardStep = 2"
+                      :disabled="!subagent.initStatus?.ready">下一步 →</button>
+              <button v-if="subagent.wizardStep === 2" @click="wizardApplyAll"
+                      :disabled="subagent.saving">{{ subagent.saving ? '应用中...' : '一键应用 ▶' }}</button>
+              <button v-if="subagent.wizardStep === 3 && !subagent.saving" class="secondary" @click="subagent.wizardStep = 2">重试</button>
+              <button v-if="subagent.wizardStep === 4" class="secondary" @click="subagent.wizardStep = 2">重新配置</button>
             </div>
-            <div class="subagent-result" v-if="subagent.result">
+
+            <div class="subagent-result" v-if="subagent.result && (subagent.wizardStep === 2 || subagent.wizardStep === 1)">
               <span :class="subagent.result.ok ? 'ok' : 'warn'">
                 created={{ subagent.result.created.length }}
                 updated={{ subagent.result.updated.length }}
@@ -809,37 +923,61 @@ createApp({
       }
     }
 
-    // Sub-agent panel
+    // Sub-agent wizard
     const SUBAGENT_NAMES = ['architect', 'implementer', 'reviewer', 'tester', 'docs-writer'];
     const subagentAgentNames = ref(SUBAGENT_NAMES);
     const subagent = reactive({
       loaded: false,
       loading: false,
+      saving: false,
       error: '',
+      wizardStep: 1,
       ccr: { available: false, path: '' },
+      initStatus: null,
       candidates: [],
+      configuredModels: [],
+      unconfiguredModels: [],
+      inheritOptions: [],
       selections: Object.fromEntries(SUBAGENT_NAMES.map(n => [n, 0])),
       rendered: [],
-      saving: false,
       result: null,
+      applyResult: null,
+      applyError: '',
     });
+
+    function candidateIndex(c) {
+      return subagent.candidates.findIndex(x => {
+        if (c.hub_model_id && x.hub_model_id === c.hub_model_id) return true;
+        if (!c.hub_model_id && !x.hub_model_id) {
+          if (c.mode === x.mode && c.provider === x.provider && c.model === x.model) return true;
+        }
+        return false;
+      });
+    }
+    subagent.candidateIndex = candidateIndex;
 
     async function loadSubagentPanel() {
       subagent.loading = true;
       subagent.error = '';
       try {
-        const [candResp, bindResp, rendResp] = await Promise.all([
+        const [candResp, bindResp, rendResp, initResp] = await Promise.all([
           apiFetch('/api/hub/subagent/candidates'),
           apiFetch('/api/hub/subagent/binding'),
           apiFetch('/api/hub/subagent/agents'),
+          apiFetch('/api/hub/subagent/init-status'),
         ]);
-        if (!candResp.ok || !bindResp.ok || !rendResp.ok) throw new Error('API 请求失败');
+        if (!candResp.ok || !bindResp.ok || !rendResp.ok || !initResp.ok) throw new Error('API 请求失败');
         const { candidates } = await candResp.json();
         const binding = await bindResp.json();
         const { agents: rendered } = await rendResp.json();
+        const initStatus = await initResp.json();
 
         subagent.candidates = candidates;
         subagent.rendered = rendered;
+        subagent.initStatus = initStatus;
+        subagent.configuredModels = candidates.filter(c => c.configured && c.mode !== 'inherit');
+        subagent.unconfiguredModels = candidates.filter(c => !c.configured);
+        subagent.inheritOptions = candidates.filter(c => c.mode === 'inherit');
 
         const currentAgents = binding.agents || {};
         for (const name of SUBAGENT_NAMES) {
@@ -855,7 +993,8 @@ createApp({
         }
         subagent.loaded = true;
 
-        // Check CCR
+        if (initStatus.ready) subagent.wizardStep = 1;
+
         const ccrResp = await apiFetch('/api/hub/subagent/ccr/test', { method: 'POST', body: '{}' });
         if (ccrResp.ok) subagent.ccr = await ccrResp.json();
       } catch (e) {
@@ -870,30 +1009,28 @@ createApp({
       if (resp.ok) subagent.ccr = await resp.json();
     }
 
+    function wizardAllInherit() {
+      const idx = subagent.candidates.findIndex(c => c.mode === 'inherit');
+      for (const name of SUBAGENT_NAMES) {
+        subagent.selections[name] = idx >= 0 ? idx : 0;
+      }
+    }
+
+    function wizardCcrPreferred() {
+      const firstCcr = subagent.configuredModels.find(c => c.requires_ccr);
+      if (firstCcr) {
+        const idx = subagent.candidateIndex(firstCcr);
+        for (const name of SUBAGENT_NAMES) {
+          subagent.selections[name] = idx >= 0 ? idx : 0;
+        }
+      }
+    }
+
     async function saveSubagentBinding() {
       subagent.saving = true;
       subagent.result = null;
       try {
-        const agents = {};
-        for (const name of SUBAGENT_NAMES) {
-          const c = subagent.candidates[subagent.selections[name]];
-          if (!c) { agents[name] = { mode: 'inherit' }; continue; }
-          if (c.mode === 'web_model') {
-            agents[name] = {
-              mode: 'web_model',
-              hub_model_id: c.hub_model_id,
-              provider: c.provider,
-              model: c.model,
-              ccr_format: c.ccr_format || '',
-            };
-          } else if (c.mode === 'ccr') {
-            agents[name] = { mode: 'ccr', provider: c.provider, model: c.model };
-          } else if (c.mode === 'native') {
-            agents[name] = { mode: 'native', model: c.model };
-          } else {
-            agents[name] = { mode: 'inherit', model: 'inherit' };
-          }
-        }
+        const agents = buildAgentsFromSelections();
         const resp = await apiFetch('/api/hub/subagent/binding', {
           method: 'POST',
           body: JSON.stringify({ agents }),
@@ -912,9 +1049,75 @@ createApp({
       }
     }
 
+    function buildAgentsFromSelections() {
+      const agents = {};
+      for (const name of SUBAGENT_NAMES) {
+        const c = subagent.candidates[subagent.selections[name]];
+        if (!c) { agents[name] = { mode: 'inherit' }; continue; }
+        if (c.mode === 'web_model') {
+          agents[name] = {
+            mode: 'web_model',
+            hub_model_id: c.hub_model_id,
+            provider: c.provider,
+            model: c.model,
+            ccr_format: c.ccr_format || '',
+          };
+        } else if (c.mode === 'ccr') {
+          agents[name] = { mode: 'ccr', provider: c.provider, model: c.model };
+        } else if (c.mode === 'native') {
+          agents[name] = { mode: 'native', model: c.model };
+        } else {
+          agents[name] = { mode: 'inherit', model: 'inherit' };
+        }
+      }
+      return agents;
+    }
+
+    async function wizardApplyAll() {
+      subagent.saving = true;
+      subagent.applyResult = null;
+      subagent.applyError = '';
+      subagent.wizardStep = 3;
+
+      const agents = buildAgentsFromSelections();
+      const firstCcr = subagent.configuredModels.find(c => c.requires_ccr);
+
+      try {
+        const resp = await apiFetch('/api/hub/subagent/apply-all', {
+          method: 'POST',
+          body: JSON.stringify({
+            agents,
+            provider: firstCcr ? firstCcr.provider : '',
+            set_as_default: false,
+          }),
+        });
+        const data = await resp.json();
+        subagent.applyResult = data;
+
+        if (data.errors && data.errors.length) {
+          subagent.applyError = data.errors.join('; ');
+        } else {
+          await refreshSubagentRendered();
+          subagent.wizardStep = 4;
+        }
+      } catch (e) {
+        subagent.applyError = e.message || '应用失败';
+      } finally {
+        subagent.saving = false;
+      }
+    }
+
     async function refreshSubagentRendered() {
       const resp = await apiFetch('/api/hub/subagent/agents');
       if (resp.ok) subagent.rendered = (await resp.json()).agents;
+    }
+
+    function wizardCopyCmd() {
+      navigator.clipboard.writeText('ccr code').then(() => {
+        subagent.result = { ok: true, created: [], updated: [], skipped: [], errors: ['已复制到剪贴板'] };
+      }).catch(() => {
+        subagent.error = '复制失败，请手动复制: ccr code';
+      });
     }
 
     // Git panel
@@ -1801,7 +2004,7 @@ createApp({
       openFiles, activeFile, entrypoints, selectedEntrypoint,
       showTerminal, terminalLines, terminalOutput, stdinInput, isRunning, currentRunId,
       showRightPanel, rightPanelView, toggleRightPanel,
-      subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, refreshSubagentRendered,
+      subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, wizardAllInherit, wizardCcrPreferred, wizardApplyAll, wizardCopyCmd, refreshSubagentRendered,
       showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
       showModelSettings, showAdvancedModelSettings, modelForm, modelStatus,
       models, runtimes, currentProfileKey, thinkingProfile,
