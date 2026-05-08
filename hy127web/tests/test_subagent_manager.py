@@ -153,17 +153,20 @@ def test_save_and_render_preserves_web_model_for_echo(tmp_path, monkeypatch):
 
 
 def test_save_and_render_web_model_native(tmp_path, monkeypatch):
-    """web_model 模式（非 CCR provider，ccr_format 为空）应渲染为 native model_id。"""
+    """web_model 模式（Anthropic provider，ccr_format 为空）应渲染为 native model_id。
+
+    只有 Anthropic/Claude 模型可以走 native 路径；第三方 provider 必须走 CCR。
+    """
     agents_dir = tmp_path / "test_agents"
     monkeypatch.setenv("HY127_TEST_AGENTS_DIR", str(agents_dir))
 
-    mgr, model = _make_manager_with_model(tmp_path, provider="openai", model_id="gpt-4o")
+    mgr, model = _make_manager_with_model(tmp_path, provider="anthropic", model_id="claude-sonnet-4-6")
     agents = {
         "implementer": {
             "mode": "web_model",
             "hub_model_id": model["id"],
-            "provider": "openai",
-            "model": "gpt-4o",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6",
             "ccr_format": "",
         },
         **{name: {"mode": "inherit", "model": "inherit"} for name in AGENT_NAMES if name != "implementer"},
@@ -174,7 +177,7 @@ def test_save_and_render_web_model_native(tmp_path, monkeypatch):
     rendered = mgr.list_rendered_agents()
     impl = next((a for a in rendered if a["name"] == "implementer"), None)
     assert impl is not None
-    assert impl["model"] == "gpt-4o"
+    assert impl["model"] == "claude-sonnet-4-6"
 
 
 # ── 绑定校验 ──────────────────────────────────────────────────────────────────

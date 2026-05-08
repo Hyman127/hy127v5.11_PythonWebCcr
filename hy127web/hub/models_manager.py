@@ -16,6 +16,7 @@ MODEL_OPTIONAL_DEFAULTS = {
     "reasoning_profile": "max",
     "is_default": False,
     "orchestration": {"enabled": False},
+    "env_key": "",
 }
 
 MODEL_FIELDS = {
@@ -39,6 +40,7 @@ class AIModel:
     reasoning_profile: str = "max"
     is_default: bool = False
     orchestration: dict | None = None
+    env_key: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -232,6 +234,7 @@ class ModelsManager:
             "reasoning_profile": kwargs.get("reasoning_profile") or "max",
             "is_default": bool(kwargs.get("is_default")) or not self._models,
             "orchestration": kwargs.get("orchestration") or {"enabled": False},
+            "env_key": kwargs.get("env_key", ""),
         }
         model = self._normalize_model(model)
         if model["is_default"]:

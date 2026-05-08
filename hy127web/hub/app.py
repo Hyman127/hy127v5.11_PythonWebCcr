@@ -5,6 +5,7 @@ import shutil
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import Response
@@ -20,6 +21,8 @@ from .subagent_manager import SubAgentManager
 from .supervisor import WorkerSupervisor
 
 logger = logging.getLogger("hub")
+
+_REPO_ROOT = Path(__file__).parent.parent.parent
 
 hub_config = HubConfig()
 auth: AuthManager | None = None
@@ -471,13 +474,14 @@ async def subagent_apply_all(request: Request):
         ccr = subagent_mgr.detect_ccr()
         if ccr["available"]:
             try:
-                ccr_result = subagent_mgr.write_ccr_config(provider, set_as_default)
+                ccr_result = subagent_mgr.write_ccr_config(provider, set_as_default, models_manager=models_mgr)
                 response_data["ccr_config"] = ccr_result
             except Exception as e:
                 response_data["errors"].append(f"[2] 写 CCR config 失败: {e}")
                 return response_data
         else:
             response_data["ccr_config"] = {"written": False, "reason": "CCR 不可用"}
+            response_data["errors"].append("[2] CCR 命令不可用，无法写入配置")
 
     # [3] 重启 CCR
     if response_data["ccr_config"] and response_data["ccr_config"].get("written"):
@@ -548,6 +552,28 @@ async def list_runtimes(request: Request):
             preset["available"] = available
             preset["path"] = path
     return {"runtimes": presets}
+
+
+@app.get("/api/hub/ai-providers")
+async def list_ai_providers(request: Request):
+    auth.require_session(request)
+    config_path = _REPO_ROOT / "ai_models_config.json"
+    if not config_path.exists():
+        return {"providers": []}
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    providers = config.get("providers", {})
+    result = []
+    for pkey, pdata in providers.items():
+        result.append({
+            "key": pkey,
+            "display_name": pdata.get("display_name", pkey),
+            "base_url": pdata.get("base_url", ""),
+            "api_type": pdata.get("api_type", "openai_compatible"),
+            "env_key": pdata.get("env_key", ""),
+            "models": pdata.get("models", []),
+        })
+    return {"providers": result}
 
 
 # ── Workspace API proxy to Worker ──

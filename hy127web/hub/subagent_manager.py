@@ -288,12 +288,14 @@ class SubAgentManager:
 
     # ── Phase W4: CCR config 写入 ─────────────────────────────────────────────
 
-    def write_ccr_config(self, provider_id: str, set_as_default: bool = False) -> dict:
+    def write_ccr_config(self, provider_id: str, set_as_default: bool = False, models_manager=None) -> dict:
         """备份 + 写入 ~/.claude-code-router/config.json。
 
         - apiKey 只写 $ENV_KEY_NAME，不写真实 Key
         - Router.default 若不存在则写入，若已有值且 set_as_default=True 则覆盖
+        - 模型列表优先使用 ModelsManager 中已配置的模型；无已配置模型时回退到 ai_models_config.json
         - 写入前生成带时间戳备份，保留最近 3 份
+        - 保留已有 config 中的其他顶层字段（无损合并）
         """
         import datetime
         import shutil as _shutil
@@ -313,12 +315,24 @@ class SubAgentManager:
             raise ValueError(f"provider {provider_id!r} 缺少 env_key，无法生成 $ENV_KEY_NAME")
 
         base_url = pdata.get("base_url", "")
-        display_name = pdata.get("display_name", provider_id)
-        models_raw = pdata.get("models", [])
-        models = [
-            m["id"] if isinstance(m, dict) and "id" in m else str(m)
-            for m in models_raw
-        ]
+
+        # 模型列表：优先取 ModelsManager 中已配置的模型，回退到 ai_models_config.json 静态列表
+        if models_manager is not None:
+            configured_models = [
+                m.get("model_id", "")
+                for m in models_manager.list_models()
+                if m.get("enabled") and m.get("provider") == provider_id and m.get("model_id")
+            ]
+        else:
+            configured_models = []
+        if configured_models:
+            models = configured_models
+        else:
+            models_raw = pdata.get("models", [])
+            models = [
+                m["id"] if isinstance(m, dict) and "id" in m else str(m)
+                for m in models_raw
+            ]
 
         # 读取现有 config
         existing = {}
@@ -349,7 +363,6 @@ class SubAgentManager:
 
         # 构造 providers 列表（兼容旧格式 NAME/HOST/APIKEY/MODELS 和新格式 name/baseUrl/apiKey/models）
         providers = existing.get("Providers", existing.get("providers", []))
-        # 查找是否已有此 provider
         found = False
         for p in providers:
             p_name = p.get("name", p.get("NAME", ""))
@@ -358,7 +371,6 @@ class SubAgentManager:
                 p["baseUrl"] = base_url
                 p["apiKey"] = f"${env_key}"
                 p["models"] = models
-                # 清理旧格式字段
                 for old_key in ("NAME", "HOST", "APIKEY", "MODELS"):
                     p.pop(old_key, None)
                 found = True
@@ -381,11 +393,14 @@ class SubAgentManager:
         else:
             router = {"default": ""}
 
-        # 写入
-        new_config = {
-            "Providers": providers,
-            "Router": router,
-        }
+        # 无损合并：基于已有 config 更新 Providers / Router，保留其他顶层字段
+        new_config = dict(existing)
+        new_config["Providers"] = providers
+        new_config["Router"] = router
+        # 清理可能的旧格式 key（小写变体不会同时在顶层共存）
+        new_config.pop("providers", None)
+        new_config.pop("router", None)
+
         ccr_config_dir.mkdir(parents=True, exist_ok=True)
         tmp = str(config_path) + ".hy127.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
@@ -406,20 +421,34 @@ class SubAgentManager:
         """从 ModelsManager 读取 Key，构造 env，subprocess 执行 ccr restart。
 
         models_manager: ModelsManager 实例，用于读取 api_keys。若为 None 则尝试从全局获取。
+
+        env_key 优先读模型记录，回退到 ai_models_config.json 的 provider 元数据。
         """
         ccr_path = shutil.which("ccr")
         if not ccr_path:
             return {"ok": False, "output": "ccr 命令不可用", "ccr_path": ""}
 
+        # 从 ai_models_config.json 构建 provider→env_key 回退映射
+        fallback_env_keys = {}
+        if _CONFIG_PATH.exists():
+            try:
+                with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                for pkey, pdata in cfg.get("providers", {}).items():
+                    ek = pdata.get("env_key", "")
+                    if ek:
+                        fallback_env_keys[pkey] = ek
+            except (OSError, json.JSONDecodeError):
+                pass
+
         env = os.environ.copy()
         if models_manager is not None:
-            # 从 ModelsManager 读取所有已配置模型的 Key，按 provider 聚合注入
             provider_env_added = set()
             for m in models_manager.list_models():
                 if not m.get("enabled"):
                     continue
                 provider = m.get("provider", "")
-                env_key_name = m.get("env_key", "")
+                env_key_name = m.get("env_key", "") or fallback_env_keys.get(provider, "")
                 if not provider or not env_key_name or provider in provider_env_added:
                     continue
                 key = models_manager.get_api_key(m["id"])

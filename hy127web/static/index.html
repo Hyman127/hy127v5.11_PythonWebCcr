@@ -88,7 +88,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 
 /* ── Right panel (AI chat) ── */
 .right-panel { width: 320px; min-width: 200px; background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
-.right-panel.collapsed { width: 0; min-width: 0; overflow: hidden; border: none; }
+.right-panel.collapsed { width: 0 !important; min-width: 0; overflow: hidden; border: none; }
+.resize-handle { width: 5px; cursor: col-resize; background: transparent; flex-shrink: 0; user-select: none; z-index: 10; }
+.resize-handle:hover, .resize-handle.active { background: var(--accent); }
 .chat-header { height: 34px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border-color); gap: 8px; }
 .chat-header .spacer { flex: 1; }
 .chat-header button { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 11px; }
@@ -125,7 +127,15 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .ai-session-bar select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
 .ai-session-bar .row { display: grid; grid-template-columns: 1fr 110px; gap: 6px; }
 .ai-session-bar .hint { color: var(--warning); font-size: 11px; min-height: 14px; }
-.model-settings .section-title { color: var(--text-bright); font-weight: 600; font-size: 12px; margin-top: 2px; }
+.config-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.config-body .section-title, .model-settings .section-title { color: var(--text-bright); font-weight: 600; font-size: 12px; margin-top: 2px; }
+.config-body .actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+.config-body .actions button { background: var(--accent); border: none; color: #fff; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.config-body .actions button.secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+.config-body .status { color: var(--text-secondary); font-size: 11px; min-height: 16px; margin-top: 4px; }
+.config-body .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+.config-body label { display: grid; gap: 3px; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; }
+.config-body input, .config-body select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
 .model-list { display: grid; gap: 4px; max-height: 120px; overflow-y: auto; }
 .model-card { border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 6px; cursor: pointer; display: grid; gap: 2px; }
 .model-card.active { border-color: var(--accent); background: rgba(0, 122, 204, 0.15); }
@@ -285,6 +295,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
       <span class="project-name">{{ projectName }}</span>
       <span class="spacer"></span>
       <button @click="toggleRightPanel('ai')" :class="{active: rightPanelView==='ai' && showRightPanel}">AI 对话</button>
+      <button @click="toggleRightPanel('config')" :class="{active: rightPanelView==='config' && showRightPanel}">AI 设置</button>
       <button @click="toggleRightPanel('subagent')" :class="{active: rightPanelView==='subagent' && showRightPanel}">Sub-agent</button>
       <button @click="goHome">项目列表</button>
     </div>
@@ -437,8 +448,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         </div>
       </div>
 
-      <!-- Right Panel (AI / Sub-agent) -->
-      <div class="right-panel" :class="{collapsed: !showRightPanel}">
+      <!-- Right Panel (AI Chat / AI Config / Sub-agent) -->
+      <div class="resize-handle" :class="{active: resizing}" @mousedown="startResize" @dblclick="resetPanelWidth"></div>
+      <div class="right-panel" :class="{collapsed: !showRightPanel}" :style="{width: showRightPanel ? rightPanelWidth + 'px' : '0px'}">
         <!-- Sub-agent wizard -->
         <template v-if="rightPanelView === 'subagent'">
           <div class="subagent-panel">
@@ -598,40 +610,72 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           </div>
         </template>
 
-        <!-- AI chat view -->
-        <template v-else>
+        <!-- AI chat view (clean, Claude Code style) -->
+        <template v-else-if="rightPanelView === 'ai'">
         <div class="chat-header">
-          AI 接入中心
+          AI 对话
           <span class="model-badge">{{ currentModelLabel }}</span>
           <span class="spacer"></span>
-          <button @click="toggleModelSettings">{{ showModelSettings ? '收起' : '设置' }}</button>
+          <button @click="toggleRightPanel('config')" title="AI 设置">&#9881;</button>
           <button @click="startNewConversation">新对话</button>
           <button @click="clearChat">清除</button>
         </div>
-        <div class="ai-session-bar">
-          <div class="row">
-            <label>当前方案
-              <select v-model="currentProfileKey">
-                <optgroup label="直接 API">
-                  <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
-                </optgroup>
-                <optgroup label="Agent 运行方式（预留）">
-                  <option v-for="p in cliProfiles" :key="p.key" :value="p.key">{{ p.label }}</option>
-                </optgroup>
-              </select>
-            </label>
-            <label>思考强度
-              <select v-model="thinkingProfile">
-                <option value="max">最佳质量</option>
-                <option value="deep">深度</option>
-                <option value="standard">标准</option>
-                <option value="quick">快速</option>
-              </select>
-            </label>
-          </div>
-          <div class="hint">{{ currentProfileHint }}</div>
+        <div class="context-selector" v-if="openFiles.length">
+          <div class="hint">选择文件作为上下文:</div>
+          <label v-for="f in openFiles" :key="f.path">
+            <input type="checkbox" :value="f.path" v-model="contextFiles" @change="updateContext" />
+            {{ f.name }}
+          </label>
         </div>
-        <div class="model-settings" v-if="showModelSettings">
+        <div class="chat-messages" ref="chatMessages">
+          <div class="chat-msg" v-for="(msg,i) in chatHistory" :key="i">
+            <div class="role" :class="msg.role">{{ msg.role === 'user' ? '你' : 'AI' }}</div>
+            <div class="body" v-html="renderMd(msg.content)"></div>
+          </div>
+          <div class="chat-msg" v-if="aiStreaming">
+            <div class="role assistant">AI</div>
+            <div class="body" v-html="renderMd(streamBuffer)"></div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <textarea v-model="chatInput" @keydown.ctrl.enter="sendChat" placeholder="输入问题... (Ctrl+Enter 发送)"></textarea>
+          <div class="send-row">
+            <button @click="sendChat" :disabled="aiStreaming || !chatInput.trim()">发送</button>
+          </div>
+        </div>
+        </template>
+
+        <!-- AI Config view (model management + session settings) -->
+        <template v-else-if="rightPanelView === 'config'">
+        <div class="chat-header">
+          AI 设置
+          <span class="spacer"></span>
+          <button @click="toggleRightPanel('ai')" title="返回对话">&#8592; 对话</button>
+        </div>
+        <div class="config-body">
+          <div class="ai-session-bar">
+            <div class="row">
+              <label>当前方案
+                <select v-model="currentProfileKey">
+                  <optgroup label="直接 API">
+                    <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
+                  </optgroup>
+                  <optgroup label="Agent 运行方式（预留）">
+                    <option v-for="p in cliProfiles" :key="p.key" :value="p.key">{{ p.label }}</option>
+                  </optgroup>
+                </select>
+              </label>
+              <label>思考强度
+                <select v-model="thinkingProfile">
+                  <option value="max">最佳质量</option>
+                  <option value="deep">深度</option>
+                  <option value="standard">标准</option>
+                  <option value="quick">快速</option>
+                </select>
+              </label>
+            </div>
+            <div class="hint">{{ currentProfileHint }}</div>
+          </div>
           <div class="section-title">模型服务</div>
           <div class="model-list" v-if="models.length">
             <div class="model-card" v-for="m in models" :key="m.id"
@@ -650,12 +694,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <div class="row">
             <label>服务商
               <select v-model="modelForm.provider" @change="applyProviderPreset">
-                <option value="deepseek">DeepSeek</option>
-                <option value="openai">OpenAI</option>
-                <option value="qwen">Qwen</option>
-                <option value="gemini">Gemini</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="openrouter">OpenRouter</option>
+                <option v-for="p in aiProviders" :key="p.key" :value="p.key">{{ p.display_name }}</option>
                 <option value="custom">自定义</option>
               </select>
             </label>
@@ -667,7 +706,10 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             <input v-model="modelForm.api_base" placeholder="https://api.deepseek.com" />
           </label>
           <label>模型 ID
-            <input v-model="modelForm.model_id" placeholder="deepseek-chat" />
+            <select v-if="modelForm.provider !== 'custom' && providerModelIds.length" v-model="modelForm.model_id">
+              <option v-for="mid in providerModelIds" :key="mid" :value="mid">{{ mid }}</option>
+            </select>
+            <input v-else v-model="modelForm.model_id" placeholder="deepseek-chat" />
           </label>
           <label>API Key
             <input v-model="modelForm.api_key" type="password" placeholder="保存后仅显示掩码；留空表示不修改" />
@@ -717,29 +759,6 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             </div>
           </div>
           <div class="status">Claude/Codex/Qwen/Gemini 壳子已预留；当前版本先启用直接 API 对话。</div>
-        </div>
-        <div class="context-selector">
-          <div class="hint">选择文件作为上下文:</div>
-          <label v-for="f in openFiles" :key="f.path">
-            <input type="checkbox" :value="f.path" v-model="contextFiles" @change="updateContext" />
-            {{ f.name }}
-          </label>
-        </div>
-        <div class="chat-messages" ref="chatMessages">
-          <div class="chat-msg" v-for="(msg,i) in chatHistory" :key="i">
-            <div class="role" :class="msg.role">{{ msg.role === 'user' ? '你' : 'AI' }}</div>
-            <div class="body" v-html="renderMd(msg.content)"></div>
-          </div>
-          <div class="chat-msg" v-if="aiStreaming">
-            <div class="role assistant">AI</div>
-            <div class="body" v-html="renderMd(streamBuffer)"></div>
-          </div>
-        </div>
-        <div class="chat-input-area">
-          <textarea v-model="chatInput" @keydown.ctrl.enter="sendChat" placeholder="输入问题... (Ctrl+Enter 发送)"></textarea>
-          <div class="send-row">
-            <button @click="sendChat" :disabled="aiStreaming || !chatInput.trim()">发送</button>
-          </div>
         </div>
         </template>
       </div>
@@ -898,6 +917,14 @@ createApp({
       is_default: false,
     });
 
+    // AI Providers (from ai_models_config.json)
+    const aiProviders = ref([]);
+    const providerModelIds = computed(() => {
+      const prov = aiProviders.value.find(p => p.key === modelForm.provider);
+      if (!prov) return [];
+      return prov.models.map(m => typeof m === 'string' ? m : m.id);
+    });
+
     // Context menu
     const contextMenu = reactive({ show: false, x: 0, y: 0, node: null });
 
@@ -916,6 +943,51 @@ createApp({
     // Right panel view
     const showRightPanel = ref(true);
     const rightPanelView = ref('ai');
+
+    // Right panel resize
+    const DEFAULT_PANEL_WIDTH = 320;
+    const MIN_PANEL_WIDTH = 200;
+    const MAX_PANEL_WIDTH = 600;
+    const rightPanelWidth = ref(DEFAULT_PANEL_WIDTH);
+    const resizing = ref(false);
+    const savedWidth = localStorage.getItem('code880_right_panel_width');
+    if (savedWidth) {
+      const n = parseInt(savedWidth, 10);
+      if (!isNaN(n) && n >= MIN_PANEL_WIDTH && n <= MAX_PANEL_WIDTH) {
+        rightPanelWidth.value = n;
+      }
+    }
+
+    function startResize(e) {
+      e.preventDefault();
+      resizing.value = true;
+      const startX = e.clientX;
+      const startWidth = rightPanelWidth.value;
+      function onMouseMove(ev) {
+        if (!resizing.value) return;
+        const deltaX = startX - ev.clientX;
+        const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, startWidth + deltaX));
+        rightPanelWidth.value = newWidth;
+      }
+      function onMouseUp() {
+        resizing.value = false;
+        localStorage.setItem('code880_right_panel_width', String(rightPanelWidth.value));
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    function resetPanelWidth() {
+      rightPanelWidth.value = DEFAULT_PANEL_WIDTH;
+      localStorage.setItem('code880_right_panel_width', String(DEFAULT_PANEL_WIDTH));
+    }
+
     function toggleRightPanel(view) {
       if (rightPanelView.value === view && showRightPanel.value) {
         showRightPanel.value = false;
@@ -923,6 +995,7 @@ createApp({
         rightPanelView.value = view;
         showRightPanel.value = true;
         if (view === 'subagent' && !subagent.loaded) loadSubagentPanel();
+        if (view === 'config') { loadModels(); loadRuntimes(); loadAiProviders(); }
       }
     }
 
@@ -1137,15 +1210,14 @@ createApp({
       if (!activeFile.value?.previewData?.sheets) return null;
       return activeFile.value.previewData.sheets[activeSheetIdx.value];
     });
-    const providerLabels = {
-      deepseek: 'DeepSeek',
-      openai: 'OpenAI',
-      qwen: 'Qwen',
-      gemini: 'Gemini',
-      anthropic: 'Anthropic',
-      openrouter: 'OpenRouter',
-      custom: 'Custom',
-    };
+    const providerLabels = computed(() => {
+      const map = {};
+      for (const p of aiProviders.value) {
+        map[p.key] = p.display_name;
+      }
+      map.custom = '自定义';
+      return map;
+    });
     const apiProfiles = computed(() => {
       const enabled = models.value.filter(m => m.enabled !== false);
       if (!enabled.length) return [{ key: '', label: '请先添加 API 模型', disabled: true }];
@@ -1282,7 +1354,7 @@ createApp({
         projectName.value = infoData.name || '';
         const epData = await epResp.json();
         entrypoints.value = epData.entrypoints || [];
-        await Promise.all([loadModels(), loadRuntimes()]);
+        await Promise.all([loadModels(), loadRuntimes(), loadAiProviders()]);
       } catch(e) { console.error(e); }
     }
 
@@ -1752,13 +1824,8 @@ createApp({
       });
     }
 
-    function toggleModelSettings() {
-      showModelSettings.value = !showModelSettings.value;
-      if (showModelSettings.value) Promise.all([loadModels(), loadRuntimes()]);
-    }
-
     function providerName(provider) {
-      return providerLabels[provider] || provider || 'Custom';
+      return providerLabels.value[provider] || provider || 'Custom';
     }
 
     function runtimeState(runtime) {
@@ -1813,54 +1880,20 @@ createApp({
     }
 
     function applyProviderPreset() {
-      const presets = {
-        deepseek: {
-          name: 'DeepSeek Reasoner',
-          api_base: 'https://api.deepseek.com',
-          model_id: 'deepseek-reasoner',
-          protocol: 'openai_chat',
-          roles: ['chat', 'planner', 'reviewer'],
-        },
-        openai: {
-          name: 'OpenAI',
-          api_base: 'https://api.openai.com/v1',
-          model_id: 'gpt-4o-mini',
-          protocol: 'openai_chat',
-          roles: ['chat'],
-        },
-        qwen: {
-          name: 'Qwen',
-          api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-          model_id: 'qwen-plus',
-          protocol: 'openai_chat',
-          roles: ['chat', 'planner'],
-        },
-        gemini: {
-          name: 'Gemini',
-          api_base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-          model_id: 'gemini-2.5-pro',
-          protocol: 'openai_chat',
-          roles: ['chat', 'planner'],
-        },
-        anthropic: {
-          name: 'Anthropic Claude',
-          api_base: 'https://api.anthropic.com',
-          model_id: 'claude-sonnet-4-5',
-          protocol: 'anthropic_messages',
-          roles: ['chat', 'planner', 'reviewer'],
-        },
-        openrouter: {
-          name: 'OpenRouter',
-          api_base: 'https://openrouter.ai/api/v1',
-          model_id: 'openai/gpt-4o-mini',
-          protocol: 'openai_chat',
-          roles: ['chat'],
-        },
-      };
-      const preset = presets[modelForm.provider];
-      if (!preset) return;
+      if (modelForm.provider === 'custom') return;
+      const prov = aiProviders.value.find(p => p.key === modelForm.provider);
+      if (!prov) return;
+      const firstModel = (prov.models && prov.models.length)
+        ? (typeof prov.models[0] === 'string' ? prov.models[0] : prov.models[0].id)
+        : '';
+      let protocol = 'openai_chat';
+      if (prov.api_type === 'anthropic') protocol = 'anthropic_messages';
+      else if (prov.api_type === 'gemini_openai') protocol = 'gemini_openai';
       Object.assign(modelForm, {
-        ...preset,
+        name: prov.display_name,
+        api_base: prov.base_url,
+        model_id: firstModel,
+        protocol: protocol,
         runtime: 'api',
         reasoning_profile: 'max',
       });
@@ -1895,6 +1928,17 @@ createApp({
         runtimes.value = data.runtimes || [];
       } catch(e) {
         runtimes.value = [];
+      }
+    }
+
+    async function loadAiProviders() {
+      try {
+        const resp = await apiFetch('/api/hub/ai-providers');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        aiProviders.value = data.providers || [];
+      } catch(e) {
+        // silently fail; modelForm defaults still work
       }
     }
 
@@ -2023,18 +2067,19 @@ createApp({
       currentView, workspaceId, projectName, projects, fileTree,
       openFiles, activeFile, entrypoints, selectedEntrypoint, hasRunnable,
       showTerminal, terminalLines, terminalOutput, stdinInput, isRunning, currentRunId,
-      showRightPanel, rightPanelView, toggleRightPanel,
+      showRightPanel, rightPanelView, rightPanelWidth, resizing, toggleRightPanel, startResize, resetPanelWidth,
       subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, wizardAllInherit, wizardCcrPreferred, wizardApplyAll, wizardCopyCmd, refreshSubagentRendered,
       showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
-      showModelSettings, showAdvancedModelSettings, modelForm, modelStatus,
+      showAdvancedModelSettings, modelForm, modelStatus,
       models, runtimes, currentProfileKey, thinkingProfile,
+      aiProviders, providerModelIds, providerLabels,
       apiProfiles, cliProfiles, currentProfileHint,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
       savingFile, saveError, fileDialog, deleteConfirm,
       showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,
       openProject, goHome, loadWorkspace, onFileSelect, onDirToggle,
       switchFile, closeFile, runFile, stopRun, sendStdin, clearTerminal,
-      sendChat, clearChat, startNewConversation, toggleAI, toggleModelSettings, applyProviderPreset,
+      sendChat, clearChat, startNewConversation, toggleAI, applyProviderPreset,
       loadModels, loadRuntimes, saveModel, testModel, deleteModel, newModel, editModel,
       providerName, runtimeState, updateContext, renderMd,
       onFileContextMenu, runContextFile, copyPath, getPreviewUrl,

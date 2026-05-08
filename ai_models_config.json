@@ -19,6 +19,7 @@
       "base_url": "https://api.moonshot.ai/v1",
       "api_type": "openai_compatible",
       "env_key": "MOONSHOT_API_KEY",
+      "requires_ccr": true,
       "model_labels": {
         "kimi-k2.5": "Kimi K2.5（Moonshot API）",
         "kimi-k2.6": "Kimi K2.6（Moonshot API）"
@@ -39,6 +40,7 @@
       "base_url": "https://api.deepseek.com/v1",
       "api_type": "openai_compatible",
       "env_key": "DEEPSEEK_API_KEY",
+      "requires_ccr": true,
       "models": [
         "deepseek-v4-pro",
         "deepseek-v4-flash",
@@ -51,6 +53,7 @@
       "base_url": "https://api.z.ai/api/openai/v1",
       "api_type": "openai_compatible",
       "env_key": "ZHIPU_API_KEY",
+      "requires_ccr": true,
       "models": [
         "glm-5.1",
         "glm-4.7"
@@ -61,6 +64,7 @@
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "api_type": "openai_compatible",
       "env_key": "DASHSCOPE_API_KEY",
+      "requires_ccr": true,
       "models": [
         "qwen3.6-max-preview",
         "qwen3.6-plus",
@@ -84,6 +88,7 @@
       "base_url": "https://api.stepfun.com/v1",
       "api_type": "openai_compatible",
       "env_key": "STEPFUN_API_KEY",
+      "requires_ccr": true,
       "models": [
         "step-3.5-flash",
         "step3"
@@ -94,6 +99,7 @@
       "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
       "api_type": "openai_compatible",
       "env_key": "HUNYUAN_API_KEY",
+      "requires_ccr": true,
       "models": [
         "hy3-preview",
         "hunyuan-t1-latest",
@@ -110,6 +116,7 @@
       "base_url": "https://api.xiaomimimo.com/v1",
       "api_type": "openai_compatible",
       "env_key": "XIAOMI_API_KEY",
+      "requires_ccr": true,
       "models": [
         "mimo-v2.5-pro",
         "mimo-v2.5",
@@ -122,6 +129,7 @@
       "base_url": "https://api.minimax.io",
       "api_type": "openai_compatible",
       "env_key": "MINIMAX_API_KEY",
+      "requires_ccr": true,
       "models": [
         "MiniMax-M2.7",
         "MiniMax-M2.5"
@@ -132,6 +140,7 @@
       "base_url": "https://ark.cn-beijing.volces.com/api/v3",
       "api_type": "openai_compatible",
       "env_key": "ARK_API_KEY",
+      "requires_ccr": true,
       "models": [
         "doubao-seed-2-0-pro-260215",
         "doubao-seed-2-0-lite-260215",
