@@ -63,6 +63,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .editor-toolbar .stop-btn { background: var(--error); color: #fff; border: none; padding: 3px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 600; }
 .editor-toolbar .stop-btn:hover { opacity: 0.9; }
 .editor-toolbar .run-select { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 3px; padding: 2px 6px; font-size: 12px; }
+.editor-toolbar .web-service-status { width: 8px; height: 8px; border-radius: 50%; background: #666; margin: 0 2px; flex-shrink: 0; }
+.editor-toolbar .web-service-status.running { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
 
 .editor-area { flex: 1; overflow: hidden; position: relative; }
 .editor-area .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 14px; }
@@ -318,7 +320,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
               <option value="">当前文件</option>
               <option v-for="ep in entrypoints" :key="ep.path" :value="ep.path">{{ ep.name }}</option>
             </select>
-            <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; 启动<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
+            <span class="web-service-status" :class="{running: isRunning}" :title="isRunning ? 'WEB服务运行中' : 'WEB服务已停止'"></span>
+            <button class="run-btn" v-if="!isRunning" @click="runFile">&#9654; WEB服务<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
             <button class="stop-btn" v-if="isRunning" @click="stopRun">&#9632; 停止<span style="font-size:9px;margin-left:3px;opacity:.65">F5</span></button>
           </template>
         </div>
