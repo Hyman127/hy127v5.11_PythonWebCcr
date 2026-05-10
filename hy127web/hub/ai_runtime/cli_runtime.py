@@ -29,20 +29,22 @@ class CliRuntime(AIRuntime):
             "name": "Codex CLI",
             "commands": ["codex"],
         },
-        "qwen_cli": {
-            "name": "Qwen Code",
-            "commands": ["qwen", "qwen-code"],
-        },
-        "gemini_cli": {
-            "name": "Gemini CLI",
-            "commands": ["gemini"],
-        },
     }
 
     PROVIDER_KEY_ALIASES = {
         "anthropic": ["ANTHROPIC_API_KEY"],
         "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
         "qwen": ["DASHSCOPE_API_KEY", "QWEN_API_KEY"],
+        "deepseek": ["DEEPSEEK_API_KEY"],
+        "moonshot": ["MOONSHOT_API_KEY"],
+        "doubao": ["ARK_API_KEY"],
+        "ark_coding_plan": ["ARK_CODING_PLAN_API_KEY"],
+        "glm": ["ZHIPU_API_KEY"],
+        "hunyuan": ["HUNYUAN_API_KEY"],
+        "mimo": ["XIAOMI_API_KEY"],
+        "minimax": ["MINIMAX_API_KEY"],
+        "stepfun": ["STEPFUN_API_KEY"],
+        "ernie": ["QIANFAN_API_KEY"],
         "openai": ["OPENAI_API_KEY"],
         "openai_codex": ["OPENAI_API_KEY"],
     }
@@ -51,6 +53,16 @@ class CliRuntime(AIRuntime):
         "anthropic": ["ANTHROPIC_BASE_URL"],
         "gemini": ["GEMINI_BASE_URL", "GOOGLE_GEMINI_BASE_URL"],
         "qwen": ["DASHSCOPE_BASE_URL"],
+        "deepseek": ["DEEPSEEK_BASE_URL"],
+        "moonshot": ["MOONSHOT_BASE_URL"],
+        "doubao": ["ARK_BASE_URL"],
+        "ark_coding_plan": ["ARK_CODING_PLAN_BASE_URL"],
+        "glm": ["ZHIPU_BASE_URL"],
+        "hunyuan": ["HUNYUAN_BASE_URL"],
+        "mimo": ["XIAOMI_BASE_URL"],
+        "minimax": ["MINIMAX_BASE_URL"],
+        "stepfun": ["STEPFUN_BASE_URL"],
+        "ernie": ["QIANFAN_BASE_URL"],
         "openai": ["OPENAI_BASE_URL", "OPENAI_API_BASE", "OPENAI_API_BASE_URL"],
         "openai_codex": ["OPENAI_BASE_URL", "OPENAI_API_BASE", "OPENAI_API_BASE_URL"],
     }
@@ -172,6 +184,8 @@ class CliRuntime(AIRuntime):
             key_names.update(self.PROVIDER_KEY_ALIASES.get(self.provider, []))
             if self.protocol in OPENAI_COMPATIBLE_PROTOCOLS:
                 key_names.add("OPENAI_API_KEY")
+            if self.runtime_id == "claude_cli" or self.protocol == "anthropic_messages":
+                key_names.add("ANTHROPIC_API_KEY")
             for key_name in key_names:
                 if key_name:
                     env[key_name] = self.api_key
@@ -180,6 +194,8 @@ class CliRuntime(AIRuntime):
             base_names = set(self.PROVIDER_BASE_ALIASES.get(self.provider, []))
             if self.protocol in OPENAI_COMPATIBLE_PROTOCOLS:
                 base_names.update(self.COMMON_OPENAI_BASE_ALIASES)
+            if self.runtime_id == "claude_cli" or self.protocol == "anthropic_messages":
+                base_names.add("ANTHROPIC_BASE_URL")
             for base_name in base_names:
                 env[base_name] = self.api_base
 
@@ -207,20 +223,6 @@ class CliRuntime(AIRuntime):
             variants.extend([
                 (["-p", "--output-format", "text"], prompt),
                 (["-p"], prompt),
-            ])
-            return variants
-
-        if self.runtime_id in {"gemini_cli", "qwen_cli"}:
-            if model:
-                variants.extend([
-                    (["-m", model, "-p"], prompt),
-                    (["--model", model, "-p"], prompt),
-                    (["-m", model, "-p", prompt], None),
-                    (["--model", model, "-p", prompt], None),
-                ])
-            variants.extend([
-                (["-p"], prompt),
-                (["-p", prompt], None),
             ])
             return variants
 

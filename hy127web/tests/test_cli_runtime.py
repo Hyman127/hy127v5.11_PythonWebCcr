@@ -3,7 +3,7 @@ from hy127web.hub.ai_runtime import CliRuntime
 
 def test_cli_runtime_injects_provider_and_openai_compatible_env(tmp_path):
     runtime = CliRuntime(
-        runtime_id="qwen_cli",
+        runtime_id="codex_cli",
         cwd=str(tmp_path),
         provider="qwen",
         protocol="openai_chat",
@@ -23,23 +23,24 @@ def test_cli_runtime_injects_provider_and_openai_compatible_env(tmp_path):
     assert env["HY127WEB_AI_PROVIDER"] == "qwen"
 
 
-def test_cli_runtime_injects_gemini_aliases(tmp_path):
+def test_cli_runtime_injects_anthropic_env_for_claude_compatible_provider(tmp_path):
     runtime = CliRuntime(
-        runtime_id="gemini_cli",
+        runtime_id="claude_cli",
         cwd=str(tmp_path),
-        provider="gemini",
-        protocol="openai_chat",
-        model="gemini-2.5-flash",
-        api_key="gemini-key",
-        api_base="https://generativelanguage.googleapis.com/v1beta/openai",
-        env_key="GEMINI_API_KEY",
+        provider="deepseek",
+        protocol="anthropic_messages",
+        model="deepseek-v4-pro",
+        api_key="deepseek-key",
+        api_base="https://api.deepseek.com/anthropic",
+        env_key="DEEPSEEK_API_KEY",
     )
 
     env = runtime._build_env({"PATH": ""})
 
-    assert env["GEMINI_API_KEY"] == "gemini-key"
-    assert env["GOOGLE_API_KEY"] == "gemini-key"
-    assert env["OPENAI_API_KEY"] == "gemini-key"
+    assert env["DEEPSEEK_API_KEY"] == "deepseek-key"
+    assert env["ANTHROPIC_API_KEY"] == "deepseek-key"
+    assert env["ANTHROPIC_BASE_URL"] == "https://api.deepseek.com/anthropic"
+    assert env["DEEPSEEK_BASE_URL"] == "https://api.deepseek.com/anthropic"
 
 
 def test_cli_runtime_does_not_export_non_http_base_url(tmp_path):
@@ -70,3 +71,8 @@ def test_cli_runtime_prompt_includes_project_and_roles(tmp_path):
     assert str(tmp_path) in prompt
     assert "SYSTEM:\n系统提示" in prompt
     assert "USER:\n修复按钮" in prompt
+
+
+def test_qwen_and_gemini_shell_presets_are_not_registered():
+    assert not CliRuntime.is_supported_runtime("qwen_cli")
+    assert not CliRuntime.is_supported_runtime("gemini_cli")

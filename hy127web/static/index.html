@@ -122,11 +122,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .model-settings button { background: var(--accent); border: none; color: #fff; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
 .model-settings button.secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
 .model-settings .status { color: var(--text-secondary); font-size: 11px; min-height: 16px; }
-.ai-session-bar { padding: 8px 12px; border-bottom: 1px solid var(--border-color); display: grid; gap: 6px; font-size: 12px; }
-.ai-session-bar label { display: grid; gap: 3px; color: var(--text-secondary); }
-.ai-session-bar select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
-.ai-session-bar .row { display: grid; grid-template-columns: 1fr 110px; gap: 6px; }
-.ai-session-bar .hint { color: var(--warning); font-size: 11px; min-height: 14px; }
+.current-model-panel { display: grid; gap: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); }
+.current-model-panel .row { grid-template-columns: minmax(0, 1fr) 110px; margin-bottom: 0; }
+.current-model-panel .hint { color: var(--warning); font-size: 11px; min-height: 14px; }
 .config-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .config-body .section-title, .model-settings .section-title { color: var(--text-bright); font-weight: 600; font-size: 12px; margin-top: 2px; }
 .config-body .actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
@@ -684,23 +682,6 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <button @click="toggleRightPanel('ai')" title="返回对话">&#8592; 对话</button>
         </div>
         <div class="config-body">
-          <div class="ai-session-bar">
-            <div class="row">
-              <label>当前模型
-                <select v-model="currentProfileKey">
-                  <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
-                </select>
-              </label>
-              <label>思考强度</label>
-              <div class="checkbox-row">
-                <label><input type="radio" v-model="thinkingProfile" value="max" /> 最佳质量</label>
-                <label><input type="radio" v-model="thinkingProfile" value="deep" /> 深度</label>
-                <label><input type="radio" v-model="thinkingProfile" value="standard" /> 标准</label>
-                <label><input type="radio" v-model="thinkingProfile" value="quick" /> 快速</label>
-              </div>
-            </div>
-            <div class="hint">{{ currentProfileHint }}</div>
-          </div>
           <div class="settings-tabs">
             <button class="settings-tab" :class="{active: configTab === 'models'}" @click="configTab = 'models'">已配置 AI</button>
             <button class="settings-tab" :class="{active: configTab === 'form'}" @click="configTab = 'form'">{{ modelForm.id ? '编辑 API Key' : '新增 API Key' }}</button>
@@ -708,7 +689,25 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           </div>
 
           <div class="settings-panel" v-if="configTab === 'models'">
-            <div class="section-title">已配置 AI</div>
+            <div class="section-title">当前模型 / 已配置 AI</div>
+            <div class="current-model-panel">
+              <div class="row">
+                <label>当前模型
+                  <select v-model="currentProfileKey">
+                    <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
+                  </select>
+                </label>
+                <label>思考强度
+                  <select v-model="thinkingProfile">
+                    <option value="max">最佳质量</option>
+                    <option value="deep">深度</option>
+                    <option value="standard">标准</option>
+                    <option value="quick">快速</option>
+                  </select>
+                </label>
+              </div>
+              <div class="hint">{{ currentProfileHint }}</div>
+            </div>
             <div class="model-list" v-if="models.length">
               <div class="model-card" v-for="m in models" :key="m.id"
                    :class="{active: modelForm.id === m.id}" @click="editModel(m)">
@@ -812,7 +811,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
               </button>
             </div>
             <div class="status" :class="runtimeStatusClass">{{ currentRuntimeHint }}</div>
-            <div class="status">{{ runtimeModelHint }}</div>
+            <div class="status" :class="resolvedRuntimeStatusClass">{{ runtimeModelHint }}</div>
           </div>
         </div>
         </template>
@@ -964,6 +963,7 @@ createApp({
     const currentProfileKey = ref('');
     const currentRuntimeId = ref(localStorage.getItem('hy127_ai_runtime_id') || 'claude_cli');
     const thinkingProfile = ref('max');
+    const resolvedRuntime = reactive({ loading: false, data: null, error: '' });
     const modelForm = reactive({
       id: '',
       name: 'DeepSeek Chat',
@@ -1325,6 +1325,13 @@ createApp({
       if (rt.implemented) return 'ok';
       return 'error';
     });
+    const resolvedRuntimeStatusClass = computed(() => {
+      if (resolvedRuntime.loading) return 'loading';
+      if (resolvedRuntime.error) return 'error';
+      if (resolvedRuntime.data && resolvedRuntime.data.supported === false) return 'error';
+      if (resolvedRuntime.data && resolvedRuntime.data.supported) return 'ok';
+      return '';
+    });
     const currentProfileHint = computed(() => {
       if (!currentProfileKey.value) return '请先在设置中添加一个 API 模型。';
       const model = selectedModel.value;
@@ -1342,13 +1349,26 @@ createApp({
     const runtimeModelHint = computed(() => {
       const model = selectedModel.value;
       if (!model) return '运行方式需要先选择一个当前模型。';
-      const envKey = modelEnvKey(model) || '按服务商默认环境变量';
-      return `运行模型：${model.name} / ${model.model_id}；Key 注入：${envKey}`;
+      if (resolvedRuntime.loading) return '正在解析当前模型与运行方式映射...';
+      if (resolvedRuntime.error) return `映射解析失败：${resolvedRuntime.error}`;
+      const data = resolvedRuntime.data;
+      if (!data) {
+        const envKey = modelEnvKey(model) || '按服务商默认环境变量';
+        return `运行模型：${model.name} / ${model.model_id}；Key 注入：${envKey}`;
+      }
+      if (data.supported === false) {
+        return `当前组合不支持：${(data.warnings || []).join('；') || '未预设映射'}`;
+      }
+      const effective = data.model || model;
+      const envKey = effective.env_key || modelEnvKey(model) || '按服务商默认环境变量';
+      const mappingTag = data.mapping_applied ? '已套用映射' : '使用保存配置';
+      const warning = (data.warnings || [])[0] ? `；${data.warnings[0]}` : '';
+      return `${mappingTag}：${providerName(effective.provider)} / ${effective.model_id}；协议：${effective.protocol || 'openai_chat'}；Base：${effective.api_base || '未设置'}；Key 注入：${envKey}${warning}`;
     });
     const subagentModelImpactHint = computed(() => {
       const enabledCount = models.value.filter(m => m.enabled !== false).length;
       const state = subagent.loaded ? 'Sub-agent 候选会随模型变更刷新' : 'Sub-agent 打开时会读取这些模型';
-      return `已启用 ${enabledCount} 个模型；${state}。`;
+      return `已启用 ${enabledCount} 个模型；${state}；运行方式映射仅影响当前会话/执行，Sub-agent 仍按绑定模型和 CCR 路由。`;
     });
     const sendButtonLabel = computed(() => currentRuntimeId.value === 'api' ? '发送' : '执行');
     const subagentBindingSummary = computed(() => SUBAGENT_NAMES.map(name => {
@@ -1959,6 +1979,40 @@ createApp({
     function selectRuntime(runtimeId) {
       currentRuntimeId.value = runtimeId || 'api';
       localStorage.setItem('hy127_ai_runtime_id', currentRuntimeId.value);
+      resolveRuntimeConfig();
+    }
+
+    async function resolveRuntimeConfig() {
+      const modelId = selectedProfile.value.modelId;
+      if (!modelId) {
+        resolvedRuntime.loading = false;
+        resolvedRuntime.data = null;
+        resolvedRuntime.error = '';
+        return;
+      }
+      resolvedRuntime.loading = true;
+      resolvedRuntime.error = '';
+      try {
+        const resp = await apiFetch('/api/hub/provider-runtime-matrix/resolve', {
+          method: 'POST',
+          body: JSON.stringify({
+            model_id: modelId,
+            runtime: currentRuntimeId.value || 'claude_cli',
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          resolvedRuntime.data = null;
+          resolvedRuntime.error = data.detail || JSON.stringify(data);
+          return;
+        }
+        resolvedRuntime.data = data;
+      } catch(e) {
+        resolvedRuntime.data = null;
+        resolvedRuntime.error = String(e);
+      } finally {
+        resolvedRuntime.loading = false;
+      }
     }
 
     function resetModelForm() {
@@ -2051,6 +2105,7 @@ createApp({
           modelStatus.value = '尚未配置模型';
         }
         ensureCurrentProfile();
+        await resolveRuntimeConfig();
       } catch(e) {
         modelStatusKind.value = 'error';
         modelStatus.value = `读取模型失败: ${e}`;
@@ -2067,6 +2122,7 @@ createApp({
           currentRuntimeId.value = runtimes.value.some(r => r.id === 'claude_cli') ? 'claude_cli' : 'api';
           localStorage.setItem('hy127_ai_runtime_id', currentRuntimeId.value);
         }
+        await resolveRuntimeConfig();
       } catch(e) {
         runtimes.value = [];
       }
@@ -2082,6 +2138,10 @@ createApp({
         // silently fail; modelForm defaults still work
       }
     }
+
+    watch([currentProfileKey, currentRuntimeId], () => {
+      resolveRuntimeConfig();
+    });
 
     async function refreshSubagentModelCandidates() {
       if (!subagent.loaded) return;
@@ -2267,7 +2327,7 @@ createApp({
       showAdvancedModelSettings, configTab, modelForm, modelStatus, modelStatusClass,
       models, runtimes, currentProfileKey, currentRuntimeId, thinkingProfile,
       aiProviders, providerModelIds, providerLabels,
-      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass, runtimeModelHint, subagentModelImpactHint, sendButtonLabel,
+      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass, resolvedRuntimeStatusClass, runtimeModelHint, subagentModelImpactHint, sendButtonLabel,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
       savingFile, saveError, fileDialog, deleteConfirm,
       showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,

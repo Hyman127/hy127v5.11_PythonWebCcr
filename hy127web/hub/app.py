@@ -14,6 +14,11 @@ from .ai_runtime import CliRuntime, DirectHttpRuntime
 from .auth import AuthManager
 from .config import HubConfig, find_available_port, get_global_dir
 from .models_manager import ModelsManager
+from .provider_runtime_matrix import (
+    get_provider_runtime_matrix,
+    normalize_runtime_id,
+    resolve_model_runtime,
+)
 from .proxy import proxy_http_to_worker, proxy_ws_to_worker
 from .registry import ProjectRegistry
 from .subagent_manager import SubAgentManager
@@ -207,7 +212,7 @@ async def ai_relay(request: Request):
     messages = body.get("messages", [])
 
     selected_model_id = body.get("model_id") or body.get("selected_model_id")
-    runtime = body.get("runtime") or "api"
+    runtime = normalize_runtime_id(body.get("runtime") or "api")
 
     if selected_model_id:
         model = models_mgr.get_model(selected_model_id)
@@ -219,17 +224,23 @@ async def ai_relay(request: Request):
     if not model:
         raise HTTPException(400, "未配置 AI 模型")
 
-    protocol = model.get("protocol") or "openai_chat"
-    if runtime in ("api", "direct_api") and protocol not in ("openai_chat", "openai_compatible"):
-        raise HTTPException(400, f"模型协议 {protocol} 已保存，但当前对话暂未接入")
+    resolved = resolve_model_runtime(model, runtime)
+    if not resolved.get("supported"):
+        warning = "；".join(resolved.get("warnings") or [])
+        raise HTTPException(400, warning or f"{resolved.get('display_name') or model.get('provider')} 暂不支持 {runtime}")
+
+    effective_model = resolved["model"]
+    protocol = effective_model.get("protocol") or "openai_chat"
+    if runtime == "api" and protocol not in ("openai_chat", "openai_compatible"):
+        raise HTTPException(400, f"模型协议 {protocol} 不能直接走 OpenAI-compatible API")
 
     api_key = models_mgr.get_api_key(model["id"])
     if not api_key:
         raise HTTPException(400, "API Key 未配置")
 
-    if runtime in ("api", "direct_api"):
+    if runtime == "api":
         ai_runtime = DirectHttpRuntime(
-            api_base=model["api_base"],
+            api_base=effective_model["api_base"],
             api_key=api_key,
             timeout=120,
         )
@@ -237,12 +248,12 @@ async def ai_relay(request: Request):
         ai_runtime = CliRuntime(
             runtime_id=runtime,
             cwd=worker.project_root,
-            provider=model.get("provider", ""),
+            provider=effective_model.get("provider", ""),
             protocol=protocol,
-            model=model.get("model_id", ""),
+            model=effective_model.get("model_id", ""),
             api_key=api_key,
-            api_base=model.get("api_base", ""),
-            env_key=_model_env_key(model),
+            api_base=effective_model.get("api_base", ""),
+            env_key=effective_model.get("env_key") or _model_env_key(effective_model),
             timeout=600,
         )
     else:
@@ -251,7 +262,7 @@ async def ai_relay(request: Request):
     async def _stream_sse():
         async for chunk in ai_runtime.chat(
             messages=messages,
-            model=model["model_id"],
+            model=effective_model["model_id"],
             stream=body.get("stream", True),
         ):
             if chunk.get("type") == "content":
@@ -562,7 +573,7 @@ async def list_runtimes(request: Request):
             "kind": "cli",
             "commands": ["claude"],
             "implemented": True,
-            "description": "调用本机 Claude Code，在当前项目目录执行任务",
+            "description": "优先开发链路：按模型映射注入 Anthropic-compatible 配置并在当前项目目录执行任务",
         },
         {
             "id": "codex_cli",
@@ -572,22 +583,6 @@ async def list_runtimes(request: Request):
             "implemented": True,
             "description": "调用本机 Codex CLI，在当前项目目录执行任务",
         },
-        {
-            "id": "qwen_cli",
-            "name": "Qwen Code",
-            "kind": "cli",
-            "commands": ["qwen", "qwen-code"],
-            "implemented": True,
-            "description": "调用本机 Qwen Code，在当前项目目录执行任务",
-        },
-        {
-            "id": "gemini_cli",
-            "name": "Gemini CLI",
-            "kind": "cli",
-            "commands": ["gemini"],
-            "implemented": True,
-            "description": "调用本机 Gemini CLI，在当前项目目录执行任务",
-        },
     ]
     for preset in presets:
         if preset.get("kind") == "cli":
@@ -595,6 +590,33 @@ async def list_runtimes(request: Request):
             preset["available"] = available
             preset["path"] = path
     return {"runtimes": presets}
+
+
+@app.get("/api/hub/provider-runtime-matrix")
+async def provider_runtime_matrix(request: Request):
+    auth.require_session(request)
+    return get_provider_runtime_matrix()
+
+
+@app.post("/api/hub/provider-runtime-matrix/resolve")
+async def resolve_provider_runtime(request: Request):
+    auth.require_session(request)
+    body = await request.json()
+    model_id = body.get("model_id") or body.get("selected_model_id")
+    runtime = normalize_runtime_id(body.get("runtime") or "claude_cli")
+
+    if model_id:
+        model = models_mgr.get_model(model_id)
+        if not model or not model.get("enabled"):
+            raise HTTPException(400, "指定的 AI 模型不存在或未启用")
+    else:
+        model = models_mgr.get_default_model()
+    if not model:
+        raise HTTPException(400, "未配置 AI 模型")
+
+    resolved = resolve_model_runtime(model, runtime)
+    resolved["source_model_id"] = model["id"]
+    return resolved
 
 
 @app.get("/api/hub/ai-providers")
