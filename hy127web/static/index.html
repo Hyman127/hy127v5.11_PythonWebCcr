@@ -738,16 +738,21 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
                   <option value="custom">自定义</option>
                 </select>
               </label>
-              <label>名称
-                <input v-model="modelForm.name" placeholder="DeepSeek Chat" />
+              <label>模型名称
+                <select v-if="modelForm.provider !== 'custom' && providerModelOptions.length"
+                        v-model="modelForm.model_id" @change="syncModelNameFromModelId">
+                  <option v-for="opt in providerModelOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                </select>
+                <input v-else v-model="modelForm.name" placeholder="DeepSeek V4-Pro" />
               </label>
             </div>
             <label>API Base
               <input v-model="modelForm.api_base" placeholder="https://api.deepseek.com" />
             </label>
             <label>模型 ID
-              <select v-if="modelForm.provider !== 'custom' && providerModelIds.length" v-model="modelForm.model_id">
-                <option v-for="mid in providerModelIds" :key="mid" :value="mid">{{ mid }}</option>
+              <select v-if="modelForm.provider !== 'custom' && providerModelOptions.length"
+                      v-model="modelForm.model_id" @change="syncModelNameFromModelId">
+                <option v-for="opt in providerModelOptions" :key="opt.id" :value="opt.id">{{ opt.id }}</option>
               </select>
               <input v-else v-model="modelForm.model_id" placeholder="deepseek-chat" />
             </label>
@@ -981,11 +986,59 @@ createApp({
 
     // AI Providers (from ai_models_config.json)
     const aiProviders = ref([]);
-    const providerModelIds = computed(() => {
+    const AI_MODEL_DISPLAY_LABELS = {
+      'deepseek-v4-pro': 'DeepSeek V4-Pro',
+      'deepseek-v4-flash': 'DeepSeek V4-Flash',
+      'deepseek-v3.2': 'DeepSeek V3.2',
+      'deepseek-chat': 'DeepSeek Chat',
+      'deepseek-reasoner': 'DeepSeek Reasoner',
+      'kimi-k2.6': 'Kimi K2.6',
+      'kimi-k2.6-thinking': 'Kimi K2.6 Thinking',
+      'kimi-k2.5': 'Kimi K2.5',
+      'kimi-k2': 'Kimi K2',
+      'qwen3.6-max-preview': 'Qwen3.6 Max Preview',
+      'qwen3.6-plus': 'Qwen3.6 Plus',
+      'qwen3.6-flash': 'Qwen3.6 Flash',
+      'qwen3-coder-next': 'Qwen3 Coder Next',
+      'qwen3-coder-plus': 'Qwen3 Coder Plus',
+      'qwen3-coder-plus-2025-09-23': 'Qwen3 Coder Plus',
+      'doubao-seed-2.0-code': 'Doubao Seed 2.0 Code',
+      'doubao-seed-2.0-pro': 'Doubao Seed 2.0 Pro',
+      'doubao-seed-2.0-lite': 'Doubao Seed 2.0 Lite',
+      'doubao-seed-2-0-code-preview-260215': 'Doubao Seed 2.0 Code',
+      'doubao-seed-2-0-pro-260215': 'Doubao Seed 2.0 Pro',
+      'doubao-seed-2-0-lite-260215': 'Doubao Seed 2.0 Lite',
+      'glm-5.1': 'GLM-5.1',
+      'glm-4.7': 'GLM-4.7',
+      'hy3-preview': 'Hunyuan Hy3 Preview',
+      'mimo-v2.5-pro': 'MiMo V2.5 Pro',
+      'mimo-v2.5': 'MiMo V2.5',
+      'mimo-v2-pro': 'MiMo V2 Pro',
+      'mimo-v2-flash': 'MiMo V2 Flash',
+      'MiniMax-M2.7': 'MiniMax M2.7',
+      'MiniMax-M2.5': 'MiniMax M2.5',
+      'step-3.5-flash': 'Step 3.5 Flash',
+      'step3': 'Step 3',
+      'ernie-5.0': 'ERNIE 5.0',
+    };
+    function providerModelOptionFrom(prov, raw) {
+      const id = typeof raw === 'string' ? raw : raw?.id;
+      if (!id) return null;
+      const label = (typeof raw === 'object' && raw?.label)
+        || prov.model_labels?.[id]
+        || AI_MODEL_DISPLAY_LABELS[id]
+        || `${prov.display_name} / ${id}`;
+      return { id, label, raw };
+    }
+    function providerModelOptionsFor(prov) {
+      if (!prov || !Array.isArray(prov.models)) return [];
+      return prov.models.map(m => providerModelOptionFrom(prov, m)).filter(Boolean);
+    }
+    const providerModelOptions = computed(() => {
       const prov = aiProviders.value.find(p => p.key === modelForm.provider);
-      if (!prov) return [];
-      return prov.models.map(m => typeof m === 'string' ? m : m.id);
+      return providerModelOptionsFor(prov);
     });
+    const providerModelIds = computed(() => providerModelOptions.value.map(opt => opt.id));
 
     // Context menu
     const contextMenu = reactive({ show: false, x: 0, y: 0, node: null });
@@ -2018,10 +2071,10 @@ createApp({
     function resetModelForm() {
       Object.assign(modelForm, {
         id: '',
-        name: 'DeepSeek Chat',
+        name: 'DeepSeek V4-Pro',
         provider: 'deepseek',
-        api_base: 'https://api.deepseek.com',
-        model_id: 'deepseek-chat',
+        api_base: 'https://api.deepseek.com/v1',
+        model_id: 'deepseek-v4-pro',
         api_key: '',
         protocol: 'openai_chat',
         env_key: 'DEEPSEEK_API_KEY',
@@ -2034,6 +2087,7 @@ createApp({
 
     function newModel() {
       resetModelForm();
+      if (aiProviders.value.length) applyProviderPreset();
       configTab.value = 'form';
       modelStatusKind.value = '';
       modelStatus.value = '正在新增模型，请填写 API Key 后保存';
@@ -2070,14 +2124,13 @@ createApp({
       if (modelForm.provider === 'custom') return;
       const prov = aiProviders.value.find(p => p.key === modelForm.provider);
       if (!prov) return;
-      const firstModel = (prov.models && prov.models.length)
-        ? (typeof prov.models[0] === 'string' ? prov.models[0] : prov.models[0].id)
-        : '';
+      const firstOption = providerModelOptionsFor(prov)[0] || null;
+      const firstModel = firstOption?.id || '';
       let protocol = 'openai_chat';
       if (prov.api_type === 'anthropic') protocol = 'anthropic_messages';
       else if (prov.api_type === 'gemini_openai') protocol = 'gemini_openai';
       Object.assign(modelForm, {
-        name: prov.display_name,
+        name: firstOption?.label || prov.display_name,
         api_base: prov.base_url,
         model_id: firstModel,
         protocol: protocol,
@@ -2085,6 +2138,14 @@ createApp({
         runtime: 'api',
         reasoning_profile: 'max',
       });
+    }
+
+    function syncModelNameFromModelId() {
+      if (modelForm.provider === 'custom') return;
+      const opt = providerModelOptions.value.find(item => item.id === modelForm.model_id);
+      if (opt) {
+        modelForm.name = opt.label;
+      }
     }
 
     async function loadModels() {
@@ -2163,6 +2224,7 @@ createApp({
     }
 
     async function saveModel() {
+      if (modelForm.provider !== 'custom') syncModelNameFromModelId();
       if (!modelForm.name || !modelForm.api_base || !modelForm.model_id) {
         modelStatusKind.value = 'error';
         modelStatus.value = '请填写名称、API Base 和模型 ID';
@@ -2326,14 +2388,14 @@ createApp({
       showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
       showAdvancedModelSettings, configTab, modelForm, modelStatus, modelStatusClass,
       models, runtimes, currentProfileKey, currentRuntimeId, thinkingProfile,
-      aiProviders, providerModelIds, providerLabels,
+      aiProviders, providerModelIds, providerModelOptions, providerLabels,
       apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass, resolvedRuntimeStatusClass, runtimeModelHint, subagentModelImpactHint, sendButtonLabel,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
       savingFile, saveError, fileDialog, deleteConfirm,
       showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,
       openProject, goHome, loadWorkspace, onFileSelect, onDirToggle,
       switchFile, closeFile, runFile, stopRun, sendStdin, clearTerminal,
-      sendChat, clearChat, startNewConversation, toggleAI, applyProviderPreset,
+      sendChat, clearChat, startNewConversation, toggleAI, applyProviderPreset, syncModelNameFromModelId,
       loadModels, loadRuntimes, refreshModelConfig, saveModel, testModel, deleteModel, newModel, editModel,
       providerName, runtimeState, updateContext, renderMd,
       modelEnvKey, selectRuntime,

@@ -58,20 +58,20 @@ def _unsupported(note: str) -> dict:
 CHINA_PROVIDER_RUNTIME_MATRIX = {
     "deepseek": {
         "display_name": "DeepSeek",
-        "models": ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
+        "models": ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-chat", "deepseek-reasoner"],
         "runtimes": {
             "api": _mapping(
                 api_base="https://api.deepseek.com/v1",
                 model_id="deepseek-v4-pro",
                 env_key="DEEPSEEK_API_KEY",
-                models=["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
+                models=["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-chat", "deepseek-reasoner"],
             ),
             "codex_cli": _mapping(
                 api_base="https://api.deepseek.com/v1",
                 model_id="deepseek-v4-pro",
                 env_key="DEEPSEEK_API_KEY",
                 note="Codex CLI 通过 OpenAI-compatible 环境变量访问 DeepSeek。",
-                models=["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
+                models=["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v3.2", "deepseek-chat", "deepseek-reasoner"],
             ),
             "claude_cli": _mapping(
                 api_base="https://api.deepseek.com/anthropic",

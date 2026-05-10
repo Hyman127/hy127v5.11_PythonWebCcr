@@ -636,6 +636,7 @@ async def list_ai_providers(request: Request):
             "base_url": pdata.get("base_url", ""),
             "api_type": pdata.get("api_type", "openai_compatible"),
             "env_key": pdata.get("env_key", ""),
+            "model_labels": pdata.get("model_labels", {}),
             "models": pdata.get("models", []),
         })
     return {"providers": result}
