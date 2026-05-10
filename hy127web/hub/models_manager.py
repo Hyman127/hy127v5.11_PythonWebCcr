@@ -296,6 +296,90 @@ class ModelsManager:
     def get_api_key(self, mid: str) -> str | None:
         return self._api_keys.get(mid)
 
+    @staticmethod
+    def _response_error_text(resp) -> str:
+        text = (resp.text or "").strip()
+        try:
+            data = resp.json()
+        except Exception:
+            return text[:300] or getattr(resp, "reason_phrase", "未知错误")
+
+        if isinstance(data, dict):
+            error = data.get("error")
+            if isinstance(error, dict):
+                message = error.get("message") or error.get("type") or error.get("code")
+                if message:
+                    return str(message)[:300]
+            if isinstance(error, str) and error:
+                return error[:300]
+            for key in ("message", "detail"):
+                value = data.get(key)
+                if value:
+                    return str(value)[:300]
+        return text[:300] or str(data)[:300]
+
+    @staticmethod
+    def _status_hint(status_code: int) -> str:
+        hints = {
+            400: "请求参数不被服务商接受，请检查模型 ID 和 API Base",
+            401: "认证失败，请检查 API Key",
+            403: "无访问权限，请检查 API Key 权限或服务商账号状态",
+            404: "接口或模型不存在，请检查 API Base 是否需要 /v1 以及模型 ID",
+            408: "服务商请求超时",
+            429: "额度不足或请求频率受限",
+        }
+        if status_code >= 500:
+            return "服务商接口异常，请稍后重试或检查服务商状态"
+        return hints.get(status_code, "服务商返回错误")
+
+    @staticmethod
+    def _exception_text(exc: Exception) -> str:
+        name = exc.__class__.__name__
+        raw = str(exc).strip()
+        if name in {"ConnectTimeout", "ReadTimeout", "PoolTimeout", "TimeoutException"}:
+            return f"连接超时：请检查 API Base 网络连通性。{raw}".strip()
+        if name in {"ConnectError", "NetworkError"}:
+            return f"连接失败：请检查 API Base 地址、代理或网络。{raw}".strip()
+        if name in {"InvalidURL", "UnsupportedProtocol"}:
+            return f"API Base 地址无效：{raw}".strip()
+        return f"{name}: {raw}" if raw else name
+
+    @staticmethod
+    async def test_openai_compatible(api_base: str, model_id: str, api_key: str) -> dict:
+        try:
+            import httpx
+        except Exception as exc:
+            return {"ok": False, "error": f"缺少 httpx 依赖，无法在线测试：{exc}"}
+
+        endpoint = f"{api_base.rstrip('/')}/chat/completions"
+        try:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            body = {
+                "model": model_id,
+                "messages": [{"role": "user", "content": "Hi"}],
+                "max_tokens": 5,
+            }
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    endpoint,
+                    json=body,
+                    headers=headers,
+                )
+            if resp.status_code == 200:
+                return {"ok": True, "message": "HTTP 200，模型接口连接正常"}
+            detail = ModelsManager._response_error_text(resp)
+            hint = ModelsManager._status_hint(resp.status_code)
+            return {
+                "ok": False,
+                "status_code": resp.status_code,
+                "error": f"HTTP {resp.status_code}：{hint}。{detail}",
+            }
+        except Exception as e:
+            return {"ok": False, "error": ModelsManager._exception_text(e)}
+
     async def test_model(self, mid: str) -> dict:
         model = self._models.get(mid)
         if not model:
@@ -305,26 +389,9 @@ class ModelsManager:
             return {"ok": False, "error": "API Key 未配置"}
         protocol = model.get("protocol") or "openai_chat"
         if protocol not in ("openai_chat", "openai_compatible"):
-            return {"ok": False, "error": f"Protocol {protocol} is saved but not connected yet"}
-        try:
-            import httpx
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-            body = {
-                "model": model["model_id"],
-                "messages": [{"role": "user", "content": "Hi"}],
-                "max_tokens": 5,
-            }
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.post(
-                    f"{model['api_base'].rstrip('/')}/chat/completions",
-                    json=body,
-                    headers=headers,
-                )
-            if resp.status_code == 200:
-                return {"ok": True}
-            return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": f"协议 {protocol} 已保存，但当前只支持 OpenAI-compatible 在线测试"}
+        return await self.test_openai_compatible(
+            api_base=model["api_base"],
+            model_id=model["model_id"],
+            api_key=api_key,
+        )

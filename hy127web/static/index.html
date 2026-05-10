@@ -133,6 +133,12 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .config-body .actions button { background: var(--accent); border: none; color: #fff; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
 .config-body .actions button.secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
 .config-body .status { color: var(--text-secondary); font-size: 11px; min-height: 16px; margin-top: 4px; }
+.config-body .status.ok,
+.config-body .status.error,
+.config-body .status.loading { border-radius: 4px; padding: 6px 8px; border: 1px solid var(--border-color); line-height: 1.35; }
+.config-body .status.ok { color: #fff; background: rgba(78,201,176,0.18); border-color: var(--success); box-shadow: 0 0 0 1px rgba(78,201,176,0.18) inset; font-weight: 600; }
+.config-body .status.error { color: #fff; background: rgba(244,71,71,0.18); border-color: var(--error); }
+.config-body .status.loading { color: #fff; background: rgba(0,122,204,0.18); border-color: var(--accent); }
 .config-body .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
 .config-body label { display: grid; gap: 3px; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; }
 .config-body input, .config-body select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
@@ -147,8 +153,14 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .checkbox-row label { display: flex; align-items: center; gap: 4px; }
 .checkbox-row input { width: auto; }
 .runtime-list { display: grid; gap: 4px; }
-.runtime-item { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 5px 6px; font-size: 11px; }
-.runtime-item .state { color: var(--text-secondary); white-space: nowrap; }
+.runtime-item { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); border-radius: 4px; padding: 6px 7px; font-size: 11px; cursor: pointer; text-align: left; }
+.runtime-item:hover { border-color: var(--accent); background: rgba(0,122,204,0.08); }
+.runtime-item.active { border-color: var(--accent); background: rgba(0,122,204,0.18); }
+.runtime-item .main { display: grid; gap: 2px; min-width: 0; }
+.runtime-item .name { color: var(--text-bright); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-item .desc { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-item .state { color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
+.runtime-item .state.current { color: var(--success); font-weight: 600; }
 
 /* ── Sub-agent wizard ── */
 .subagent-panel { display: flex; flex-direction: column; height: 100%; }
@@ -163,6 +175,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .subagent-warn { background: rgba(204,167,0,0.1); border: 1px solid var(--warning); color: var(--warning); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
 .subagent-info { background: rgba(78,201,176,0.08); border: 1px solid rgba(78,201,176,0.3); color: var(--success); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
 .subagent-bindings { display: flex; flex-direction: column; gap: 4px; }
+.subagent-binding-item { display: grid; gap: 3px; }
 .subagent-row { display: flex; align-items: center; gap: 6px; }
 .subagent-name { font-size: 12px; color: var(--text-secondary); width: 90px; flex-shrink: 0; }
 .subagent-select { flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 3px 5px; font-size: 11px; min-width: 0; }
@@ -173,6 +186,10 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .subagent-model-badge { color: var(--success); font-size: 10px; background: rgba(78,201,176,0.1); border: 1px solid rgba(78,201,176,0.3); border-radius: 3px; padding: 1px 5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subagent-empty { color: var(--text-secondary); font-size: 11px; }
 .subagent-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.subagent-detail { margin-left: 96px; color: var(--text-secondary); font-size: 10px; line-height: 1.35; word-break: break-all; }
+.subagent-detail .em { color: var(--success); }
+.subagent-summary { border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 6px 8px; display: grid; gap: 4px; }
+.subagent-summary-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
 .subagent-loading { color: var(--text-secondary); font-size: 12px; padding: 12px 0; }
 .subagent-error { color: var(--error); font-size: 11px; }
 .subagent-footer { padding: 8px 12px; border-top: 1px solid var(--border-color); display: flex; gap: 6px; flex-shrink: 0; }
@@ -504,23 +521,26 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
                   <button class="secondary" style="font-size:11px;padding:2px 8px;margin-bottom:4px" @click="wizardCcrPreferred" :disabled="!subagent.configuredModels.length">一键 CCR 首选</button>
                 </div>
                 <div class="subagent-bindings">
-                  <div v-for="name in subagentAgentNames" :key="name" class="subagent-row">
-                    <span class="subagent-name">{{ name }}</span>
-                    <select v-model="subagent.selections[name]" class="subagent-select">
-                      <optgroup label="──── 继承 ────">
-                        <option v-for="(c, i) in subagent.inheritOptions" :key="'inh-'+i" :value="subagent.candidateIndex(c)">{{ c.label }}</option>
-                      </optgroup>
-                      <optgroup label="──── 已配置模型 ────">
-                        <option v-for="c in subagent.configuredModels" :key="'cfg-'+c.hub_model_id" :value="subagent.candidateIndex(c)">
-                          {{ c.label }}
-                        </option>
-                      </optgroup>
-                      <optgroup label="──── 候选（需先在模型管理页配置）────">
-                        <option v-for="c in subagent.unconfiguredModels" :key="'uncfg-'+c.provider+'-'+c.model" :value="subagent.candidateIndex(c)" disabled>
-                          {{ c.label }}
-                        </option>
-                      </optgroup>
-                    </select>
+                  <div v-for="name in subagentAgentNames" :key="name" class="subagent-binding-item">
+                    <div class="subagent-row">
+                      <span class="subagent-name">{{ name }}</span>
+                      <select v-model="subagent.selections[name]" class="subagent-select">
+                        <optgroup label="──── 继承 ────">
+                          <option v-for="(c, i) in subagent.inheritOptions" :key="'inh-'+i" :value="subagent.candidateIndex(c)">{{ c.label }}</option>
+                        </optgroup>
+                        <optgroup label="──── 已配置模型 ────">
+                          <option v-for="c in subagent.configuredModels" :key="'cfg-'+c.hub_model_id" :value="subagent.candidateIndex(c)">
+                            {{ c.label }}
+                          </option>
+                        </optgroup>
+                        <optgroup label="──── 候选（需先在模型管理页配置）────">
+                          <option v-for="c in subagent.unconfiguredModels" :key="'uncfg-'+c.provider+'-'+c.model" :value="subagent.candidateIndex(c)" disabled>
+                            {{ c.label }}
+                          </option>
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div class="subagent-detail">{{ subagentCandidateDetail(name) }}</div>
                   </div>
                 </div>
               </template>
@@ -573,6 +593,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
                 </div>
                 <div class="subagent-warn" style="margin-top:6px">
                   ⚠ 请勿在外部终端手动执行 ccr restart，那样会绕过 Hub 的 env 注入（API Key 不可用）。
+                </div>
+                <div class="section-label" style="margin-top:8px">绑定细节</div>
+                <div class="subagent-summary">
+                  <div v-for="row in subagentBindingSummary" :key="row.name" class="subagent-summary-row">
+                    <span>{{ row.name }}</span>
+                    <span class="subagent-model-badge" :title="row.detail">{{ row.label }}</span>
+                  </div>
                 </div>
                 <div class="section-label" style="margin-top:8px">当前渲染结果</div>
                 <div v-for="a in subagent.rendered" :key="a.name" class="subagent-rendered-row">
@@ -653,14 +680,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         <div class="config-body">
           <div class="ai-session-bar">
             <div class="row">
-              <label>当前方案
+              <label>当前模型
                 <select v-model="currentProfileKey">
-                  <optgroup label="直接 API">
-                    <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
-                  </optgroup>
-                  <optgroup label="Agent 运行方式（预留）">
-                    <option v-for="p in cliProfiles" :key="p.key" :value="p.key">{{ p.label }}</option>
-                  </optgroup>
+                  <option v-for="p in apiProfiles" :key="p.key" :value="p.key" :disabled="p.disabled">{{ p.label }}</option>
                 </select>
               </label>
               <label>思考强度</label>
@@ -747,15 +769,19 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             <button class="secondary" @click="testModel">测试</button>
             <button @click="saveModel">保存</button>
           </div>
-          <div class="status">{{ modelStatus }}</div>
-          <div class="section-title">运行方式预设</div>
+          <div class="status" :class="modelStatusClass">{{ modelStatus }}</div>
+          <div class="section-title">运行方式</div>
           <div class="runtime-list">
-            <div class="runtime-item" v-for="r in runtimes" :key="r.id">
-              <span>{{ r.name }}</span>
-              <span class="state">{{ runtimeState(r) }}</span>
-            </div>
+            <button type="button" class="runtime-item" v-for="r in runtimes" :key="r.id"
+                    :class="{active: currentRuntimeId === r.id}" @click="selectRuntime(r.id)">
+              <span class="main">
+                <span class="name">{{ r.name }}</span>
+                <span class="desc">{{ r.description }}</span>
+              </span>
+              <span class="state" :class="{current: currentRuntimeId === r.id}">{{ runtimeState(r) }}</span>
+            </button>
           </div>
-          <div class="status">Claude/Codex/Qwen/Gemini 壳子已预留；当前版本先启用直接 API 对话。</div>
+          <div class="status" :class="runtimeStatusClass">{{ currentRuntimeHint }}</div>
         </div>
         </template>
       </div>
@@ -899,9 +925,11 @@ createApp({
     const showModelSettings = ref(false);
     const showAdvancedModelSettings = ref(false);
     const modelStatus = ref('');
+    const modelStatusKind = ref('');
     const models = ref([]);
     const runtimes = ref([]);
     const currentProfileKey = ref('');
+    const currentRuntimeId = ref(localStorage.getItem('hy127_ai_runtime_id') || 'claude_cli');
     const thinkingProfile = ref('max');
     const modelForm = reactive({
       id: '',
@@ -1227,13 +1255,6 @@ createApp({
         model: m,
       }));
     });
-    const cliProfiles = computed(() => runtimes.value
-      .filter(r => r.id !== 'api')
-      .map(r => ({
-        key: `${r.id}:`,
-        label: `${r.name} · ${r.available ? '已检测' : '未检测'} · 预留`,
-        runtime: r,
-      })));
     const selectedProfile = computed(() => {
       const [runtime, modelId] = (currentProfileKey.value || '').split(':');
       return { runtime: runtime || 'api', modelId: modelId || '' };
@@ -1241,25 +1262,72 @@ createApp({
     const selectedModel = computed(() =>
       models.value.find(m => m.id === selectedProfile.value.modelId) || null
     );
+    const selectedRuntime = computed(() =>
+      runtimes.value.find(r => r.id === currentRuntimeId.value)
+        || { id: currentRuntimeId.value, name: currentRuntimeId.value === 'claude_cli' ? 'Claude Code' : '直接 API', implemented: currentRuntimeId.value === 'api', available: currentRuntimeId.value === 'api' }
+    );
     const currentModelLabel = computed(() => {
-      if (selectedProfile.value.runtime !== 'api') {
-        const rt = runtimes.value.find(r => r.id === selectedProfile.value.runtime);
-        return rt ? `${rt.name} / 预留` : 'Agent 预留';
-      }
       const model = selectedModel.value;
+      const runtime = selectedRuntime.value;
+      if (runtime?.id && runtime.id !== 'api') {
+        return `${runtime.name} / ${runtime.available ? '已检测' : '预留'}`;
+      }
       if (!model) return 'AI 未配置';
       return `${providerName(model.provider)} / ${model.model_id || 'model'}`;
     });
+    const modelStatusClass = computed(() => modelStatusKind.value || '');
+    const runtimeStatusClass = computed(() => {
+      const rt = selectedRuntime.value;
+      if (!rt || rt.implemented) return 'ok';
+      if (rt.available) return 'loading';
+      return 'error';
+    });
     const currentProfileHint = computed(() => {
       if (!currentProfileKey.value) return '请先在设置中添加一个 API 模型。';
-      if (selectedProfile.value.runtime !== 'api') {
-        const rt = runtimes.value.find(r => r.id === selectedProfile.value.runtime);
-        return `${rt?.name || 'Agent'} 壳子已预留；当前版本先启用直接 API 对话。`;
-      }
       const model = selectedModel.value;
       if (!model) return '';
-      return `本次对话使用 ${model.name}，思考强度默认为最佳质量，可随时切换方案。`;
+      return `当前模型：${model.name}；运行方式在下方单独切换。`;
     });
+    const currentRuntimeHint = computed(() => {
+      const rt = selectedRuntime.value;
+      if (!rt) return '';
+      if (rt.id === 'api') return '直接 API 已启用。';
+      if (rt.implemented) return `${rt.name} 已启用。`;
+      const detected = rt.available ? '已检测到命令' : '未检测到命令';
+      return `${rt.name} 已选为运行方式，${detected}；CLI 桥接仍处于预留状态。`;
+    });
+    const subagentBindingSummary = computed(() => SUBAGENT_NAMES.map(name => {
+      const c = subagent.candidates[subagent.selections[name]];
+      if (!c) return { name, label: 'inherit', detail: '未选择，按 inherit 处理' };
+      if (c.mode === 'inherit') return { name, label: 'inherit', detail: '继承主会话模型' };
+      if (c.mode === 'web_model') {
+        return {
+          name,
+          label: `${c.provider}/${c.model}`,
+          detail: `Hub 模型 ${c.hub_model_id || ''}；${c.requires_ccr ? '通过 CCR 路由' : '原生模型字段'}`,
+        };
+      }
+      return {
+        name,
+        label: `${c.provider || c.mode}/${c.model}`,
+        detail: `${c.mode}${c.requires_ccr ? '；需要 CCR' : ''}`,
+      };
+    }));
+
+    function subagentCandidateDetail(name) {
+      const c = subagent.candidates[subagent.selections[name]];
+      if (!c) return '当前未选择，保存时将按 inherit 处理';
+      if (c.mode === 'inherit') return '继承主会话模型，不单独指定 provider/model';
+      if (c.mode === 'web_model') {
+        const route = c.requires_ccr
+          ? `CCR 路由 ${c.ccr_format || `${c.provider},${c.model}`}`
+          : '原生 model 字段';
+        return `Hub 模型 ${c.hub_model_id || '-'}；provider=${c.provider || '-'}；model=${c.model || '-'}；${route}`;
+      }
+      if (c.mode === 'ccr') return `CCR 候选；provider=${c.provider || '-'}；model=${c.model || '-'}；需先在模型管理配置 Key`;
+      if (c.mode === 'native') return `Native 候选；model=${c.model || '-'}；需先在模型管理配置 Key`;
+      return `${c.mode || 'unknown'}；${c.label || ''}`;
+    }
 
     const wsBase = computed(() => `/api/workspaces/${workspaceId.value}`);
     const hasRunnable = computed(() => !!workspaceId.value);
@@ -1753,16 +1821,16 @@ createApp({
     async function sendChat() {
       const msg = chatInput.value.trim();
       if (!msg || aiStreaming.value) return;
-      if (!currentProfileKey.value) {
-        chatHistory.value.push({ role: 'assistant', content: '请先在设置中添加一个 API 模型。' });
-        return;
-      }
-      if (selectedProfile.value.runtime !== 'api') {
-        const rt = runtimes.value.find(r => r.id === selectedProfile.value.runtime);
+      if (currentRuntimeId.value !== 'api') {
+        const rt = selectedRuntime.value;
         chatHistory.value.push({
           role: 'assistant',
           content: `${rt?.name || 'Agent'} 运行方式已预留，CLI 桥接会在下一阶段启用。当前请先选择“直接 API”方案。`,
         });
+        return;
+      }
+      if (!currentProfileKey.value) {
+        chatHistory.value.push({ role: 'assistant', content: '请先在设置中添加一个 API 模型。' });
         return;
       }
       chatHistory.value.push({ role: 'user', content: msg });
@@ -1776,7 +1844,7 @@ createApp({
           body: JSON.stringify({
             message: msg,
             model_id: selectedProfile.value.modelId,
-            runtime: selectedProfile.value.runtime,
+            runtime: currentRuntimeId.value,
             thinking_profile: thinkingProfile.value,
           }),
         });
@@ -1829,8 +1897,15 @@ createApp({
     }
 
     function runtimeState(runtime) {
-      if (runtime.implemented) return '已启用';
-      return `${runtime.available ? '已检测' : '未检测'} · 预留`;
+      const current = currentRuntimeId.value === runtime.id;
+      if (runtime.implemented) return current ? '当前启用' : '可启用';
+      const detected = runtime.available ? '已检测' : '未检测';
+      return current ? `当前启用 · ${detected}` : `${detected} · 预留`;
+    }
+
+    function selectRuntime(runtimeId) {
+      currentRuntimeId.value = runtimeId || 'api';
+      localStorage.setItem('hy127_ai_runtime_id', currentRuntimeId.value);
     }
 
     function resetModelForm() {
@@ -1851,6 +1926,7 @@ createApp({
 
     function newModel() {
       resetModelForm();
+      modelStatusKind.value = '';
       modelStatus.value = '正在新增模型，请填写 API Key 后保存';
     }
 
@@ -1868,11 +1944,11 @@ createApp({
         reasoning_profile: model.reasoning_profile || 'max',
         is_default: !!model.is_default,
       });
+      modelStatusKind.value = '';
       modelStatus.value = `已选择: ${model.name} (${model.api_key_masked || 'key 已保存'})`;
     }
 
     function ensureCurrentProfile() {
-      if (currentProfileKey.value && selectedProfile.value.runtime !== 'api') return;
       if (currentProfileKey.value && apiProfiles.value.some(p => p.key === currentProfileKey.value)) return;
       const model = models.value.find(m => m.is_default && m.enabled !== false)
         || models.value.find(m => m.enabled !== false);
@@ -1912,10 +1988,12 @@ createApp({
           editModel(model);
         } else {
           resetModelForm();
+          modelStatusKind.value = '';
           modelStatus.value = '尚未配置模型';
         }
         ensureCurrentProfile();
       } catch(e) {
+        modelStatusKind.value = 'error';
         modelStatus.value = `读取模型失败: ${e}`;
       }
     }
@@ -1926,6 +2004,10 @@ createApp({
         if (!resp.ok) return;
         const data = await resp.json();
         runtimes.value = data.runtimes || [];
+        if (!runtimes.value.some(r => r.id === currentRuntimeId.value)) {
+          currentRuntimeId.value = runtimes.value.some(r => r.id === 'claude_cli') ? 'claude_cli' : 'api';
+          localStorage.setItem('hy127_ai_runtime_id', currentRuntimeId.value);
+        }
       } catch(e) {
         runtimes.value = [];
       }
@@ -1944,10 +2026,12 @@ createApp({
 
     async function saveModel() {
       if (!modelForm.name || !modelForm.api_base || !modelForm.model_id) {
+        modelStatusKind.value = 'error';
         modelStatus.value = '请填写名称、API Base 和模型 ID';
         return;
       }
       if (!modelForm.id && !modelForm.api_key) {
+        modelStatusKind.value = 'error';
         modelStatus.value = '首次保存必须填写 API Key';
         return;
       }
@@ -1966,6 +2050,7 @@ createApp({
       if (modelForm.id) body.id = modelForm.id;
       if (modelForm.api_key) body.api_key = modelForm.api_key;
 
+      modelStatusKind.value = 'loading';
       modelStatus.value = '正在保存...';
       try {
         const resp = await apiFetch('/api/hub/models', {
@@ -1974,6 +2059,7 @@ createApp({
         });
         const data = await resp.json();
         if (!resp.ok) {
+          modelStatusKind.value = 'error';
           modelStatus.value = data.detail || JSON.stringify(data);
           return;
         }
@@ -1981,45 +2067,53 @@ createApp({
         modelForm.api_key = '';
         await loadModels();
         currentProfileKey.value = `api:${data.id}`;
+        modelStatusKind.value = 'ok';
         modelStatus.value = `已保存: ${data.name} (${data.api_key_masked || 'key 已保存'})`;
       } catch(e) {
+        modelStatusKind.value = 'error';
         modelStatus.value = `保存失败: ${e}`;
       }
     }
 
     async function deleteModel() {
       if (!modelForm.id) return;
+      modelStatusKind.value = 'loading';
       modelStatus.value = '正在删除...';
       try {
         const resp = await apiFetch(`/api/hub/models/${modelForm.id}`, { method: 'DELETE' });
         const data = await resp.json();
         if (!resp.ok) {
+          modelStatusKind.value = 'error';
           modelStatus.value = data.detail || JSON.stringify(data);
           return;
         }
         resetModelForm();
         await loadModels();
+        modelStatusKind.value = 'ok';
         modelStatus.value = '已删除';
       } catch(e) {
+        modelStatusKind.value = 'error';
         modelStatus.value = `删除失败: ${e}`;
       }
     }
 
     async function testModel() {
+      modelStatusKind.value = 'loading';
       modelStatus.value = '正在测试...';
       try {
         let resp;
-        if (modelForm.id) {
+        if (modelForm.id && !modelForm.api_key) {
           resp = await apiFetch(`/api/hub/models/${modelForm.id}/test`, { method: 'POST' });
         } else {
           if (!modelForm.api_base || !modelForm.model_id || !modelForm.api_key) {
+            modelStatusKind.value = 'error';
             modelStatus.value = '请填写 API Base、模型 ID 和 API Key';
             return;
           }
           resp = await apiFetch('/api/hub/models/test-inline', {
             method: 'POST',
             body: JSON.stringify({
-              api_base: modelForm.api_base,
+              api_base: modelForm.api_base.replace(/\/+$/, ''),
               model_id: modelForm.model_id,
               api_key: modelForm.api_key,
               protocol: modelForm.protocol,
@@ -2027,8 +2121,12 @@ createApp({
           });
         }
         const data = await resp.json();
-        modelStatus.value = data.ok ? '测试通过' : `测试失败: ${data.error || JSON.stringify(data)}`;
+        modelStatusKind.value = data.ok ? 'ok' : 'error';
+        modelStatus.value = data.ok
+          ? `测试通过：${data.message || '模型接口连接正常'}`
+          : `测试失败：${data.error || data.detail || JSON.stringify(data)}`;
       } catch(e) {
+        modelStatusKind.value = 'error';
         modelStatus.value = `测试失败: ${e}`;
       }
     }
@@ -2082,11 +2180,12 @@ createApp({
       showTerminal, terminalLines, terminalOutput, stdinInput, isRunning, currentRunId,
       showRightPanel, rightPanelView, rightPanelWidth, resizing, toggleRightPanel, startResize, resetPanelWidth,
       subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, wizardAllInherit, wizardCcrPreferred, wizardApplyAll, wizardCopyCmd, refreshSubagentRendered,
+      subagentCandidateDetail, subagentBindingSummary,
       showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
-      showAdvancedModelSettings, modelForm, modelStatus,
-      models, runtimes, currentProfileKey, thinkingProfile,
+      showAdvancedModelSettings, modelForm, modelStatus, modelStatusClass,
+      models, runtimes, currentProfileKey, currentRuntimeId, thinkingProfile,
       aiProviders, providerModelIds, providerLabels,
-      apiProfiles, cliProfiles, currentProfileHint,
+      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
       savingFile, saveError, fileDialog, deleteConfirm,
       showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,
@@ -2095,6 +2194,7 @@ createApp({
       sendChat, clearChat, startNewConversation, toggleAI, applyProviderPreset,
       loadModels, loadRuntimes, saveModel, testModel, deleteModel, newModel, editModel,
       providerName, runtimeState, updateContext, renderMd,
+      selectRuntime,
       onFileContextMenu, runContextFile, copyPath, getPreviewUrl,
       addTerminalLine,
       saveActiveFile, markDirty,

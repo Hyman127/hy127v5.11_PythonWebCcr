@@ -350,17 +350,7 @@ async def test_model_inline(request: Request):
         return {"ok": False, "error": "请填写 API Base、模型 ID 和 API Key"}
     if protocol not in ("openai_chat", "openai_compatible"):
         return {"ok": False, "error": f"协议 {protocol} 暂不支持在线测试"}
-    try:
-        import httpx
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        payload = {"model": model_id, "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 5}
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(f"{api_base.rstrip('/')}/chat/completions", json=payload, headers=headers)
-        if resp.status_code == 200:
-            return {"ok": True}
-        return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    return await ModelsManager.test_openai_compatible(api_base, model_id, api_key)
 
 
 @app.post("/api/hub/models/{model_id}/test")
