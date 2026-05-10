@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import shutil
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -11,7 +10,7 @@ from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from .ai_runtime import DirectHttpRuntime
+from .ai_runtime import CliRuntime, DirectHttpRuntime
 from .auth import AuthManager
 from .config import HubConfig, find_available_port, get_global_dir
 from .models_manager import ModelsManager
@@ -30,6 +29,33 @@ registry: ProjectRegistry | None = None
 supervisor: WorkerSupervisor | None = None
 models_mgr: ModelsManager | None = None
 subagent_mgr: SubAgentManager | None = None
+
+
+def _worker_for_token(worker_token: str):
+    if not worker_token or supervisor is None:
+        return None
+    for worker in supervisor._workers.values():
+        if worker.internal_token == worker_token:
+            return worker
+    return None
+
+
+def _providers_config() -> dict:
+    config_path = _REPO_ROOT / "ai_models_config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f).get("providers", {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _model_env_key(model: dict) -> str:
+    if model.get("env_key"):
+        return model["env_key"]
+    provider = model.get("provider", "")
+    return _providers_config().get(provider, {}).get("env_key", "")
 
 
 @asynccontextmanager
@@ -173,10 +199,8 @@ async def ai_relay(request: Request):
     """Internal AI relay: Worker calls this, Hub injects API key and proxies to provider.
     Authenticated by Worker token (matched against any active worker)."""
     worker_token = request.headers.get("X-Worker-Token", "")
-    if not any(
-        w.internal_token == worker_token
-        for w in supervisor._workers.values()
-    ):
+    worker = _worker_for_token(worker_token)
+    if not worker:
         raise HTTPException(403, "Worker token 无效")
 
     body = await request.json()
@@ -184,9 +208,6 @@ async def ai_relay(request: Request):
 
     selected_model_id = body.get("model_id") or body.get("selected_model_id")
     runtime = body.get("runtime") or "api"
-
-    if runtime not in ("api", "direct_api"):
-        raise HTTPException(400, f"运行方式 {runtime} 已预留，CLI 桥接尚未启用")
 
     if selected_model_id:
         model = models_mgr.get_model(selected_model_id)
@@ -199,18 +220,33 @@ async def ai_relay(request: Request):
         raise HTTPException(400, "未配置 AI 模型")
 
     protocol = model.get("protocol") or "openai_chat"
-    if protocol not in ("openai_chat", "openai_compatible"):
+    if runtime in ("api", "direct_api") and protocol not in ("openai_chat", "openai_compatible"):
         raise HTTPException(400, f"模型协议 {protocol} 已保存，但当前对话暂未接入")
 
     api_key = models_mgr.get_api_key(model["id"])
     if not api_key:
         raise HTTPException(400, "API Key 未配置")
 
-    ai_runtime = DirectHttpRuntime(
-        api_base=model["api_base"],
-        api_key=api_key,
-        timeout=120,
-    )
+    if runtime in ("api", "direct_api"):
+        ai_runtime = DirectHttpRuntime(
+            api_base=model["api_base"],
+            api_key=api_key,
+            timeout=120,
+        )
+    elif CliRuntime.is_supported_runtime(runtime):
+        ai_runtime = CliRuntime(
+            runtime_id=runtime,
+            cwd=worker.project_root,
+            provider=model.get("provider", ""),
+            protocol=protocol,
+            model=model.get("model_id", ""),
+            api_key=api_key,
+            api_base=model.get("api_base", ""),
+            env_key=_model_env_key(model),
+            timeout=600,
+        )
+    else:
+        raise HTTPException(400, f"未知运行方式: {runtime}")
 
     async def _stream_sse():
         async for chunk in ai_runtime.chat(
@@ -306,7 +342,7 @@ async def add_or_update_model(request: Request):
         k: body[k]
         for k in (
             "protocol", "runtime", "roles", "reasoning_profile",
-            "enabled", "is_default", "orchestration",
+            "enabled", "is_default", "orchestration", "env_key",
         )
         if k in body
     }
@@ -508,14 +544,6 @@ async def subagent_apply_all(request: Request):
     return response_data
 
 
-def _runtime_available(commands: list[str]) -> tuple[bool, str]:
-    for cmd in commands:
-        path = shutil.which(cmd)
-        if path:
-            return True, path
-    return False, ""
-
-
 @app.get("/api/hub/runtimes")
 async def list_runtimes(request: Request):
     auth.require_session(request)
@@ -533,37 +561,37 @@ async def list_runtimes(request: Request):
             "name": "Claude Code",
             "kind": "cli",
             "commands": ["claude"],
-            "implemented": False,
-            "description": "预留：后续通过 Claude CLI 提供编程 Agent 对话",
+            "implemented": True,
+            "description": "调用本机 Claude Code，在当前项目目录执行任务",
         },
         {
             "id": "codex_cli",
             "name": "Codex CLI",
             "kind": "cli",
             "commands": ["codex"],
-            "implemented": False,
-            "description": "预留：后续通过 Codex CLI 提供编程 Agent 对话",
+            "implemented": True,
+            "description": "调用本机 Codex CLI，在当前项目目录执行任务",
         },
         {
             "id": "qwen_cli",
             "name": "Qwen Code",
             "kind": "cli",
             "commands": ["qwen", "qwen-code"],
-            "implemented": False,
-            "description": "预留：后续接入 Qwen 编程运行时",
+            "implemented": True,
+            "description": "调用本机 Qwen Code，在当前项目目录执行任务",
         },
         {
             "id": "gemini_cli",
             "name": "Gemini CLI",
             "kind": "cli",
             "commands": ["gemini"],
-            "implemented": False,
-            "description": "预留：后续通过 Gemini CLI 提供 Agent 对话",
+            "implemented": True,
+            "description": "调用本机 Gemini CLI，在当前项目目录执行任务",
         },
     ]
     for preset in presets:
         if preset.get("kind") == "cli":
-            available, path = _runtime_available(preset["commands"])
+            available, path = CliRuntime.command_available(preset["id"])
             preset["available"] = available
             preset["path"] = path
     return {"runtimes": presets}

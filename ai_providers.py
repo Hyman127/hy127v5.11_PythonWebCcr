@@ -114,6 +114,17 @@ BUILTIN_PROVIDERS = {
             "qwen-long",
         ],
     },
+    "gemini": {
+        "display_name": "Google/Gemini",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "api_type": "openai_compatible",
+        "env_key": "GEMINI_API_KEY",
+        "models": [
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+        ],
+    },
     "hunyuan": {
         "display_name": "腾讯混元",
         "base_url": "https://api.hunyuan.cloud.tencent.com/v1",

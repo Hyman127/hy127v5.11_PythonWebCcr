@@ -665,7 +665,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         <div class="chat-input-area">
           <textarea v-model="chatInput" @keydown.ctrl.enter="sendChat" placeholder="输入问题... (Ctrl+Enter 发送)"></textarea>
           <div class="send-row">
-            <button @click="sendChat" :disabled="aiStreaming || !chatInput.trim()">发送</button>
+            <button @click="sendChat" :disabled="aiStreaming || !chatInput.trim()">{{ sendButtonLabel }}</button>
           </div>
         </div>
         </template>
@@ -745,6 +745,11 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
                   <option value="gemini_openai">Gemini</option>
                 </select>
               </label>
+              <label>环境变量 Key
+                <input v-model="modelForm.env_key" placeholder="如 DASHSCOPE_API_KEY / GEMINI_API_KEY" />
+              </label>
+            </div>
+            <div class="row">
               <label>默认思考
                 <select v-model="modelForm.reasoning_profile">
                   <option value="max">最佳质量</option>
@@ -939,6 +944,7 @@ createApp({
       model_id: 'deepseek-chat',
       api_key: '',
       protocol: 'openai_chat',
+      env_key: 'DEEPSEEK_API_KEY',
       runtime: 'api',
       roles: ['chat'],
       reasoning_profile: 'max',
@@ -1270,7 +1276,7 @@ createApp({
       const model = selectedModel.value;
       const runtime = selectedRuntime.value;
       if (runtime?.id && runtime.id !== 'api') {
-        return `${runtime.name} / ${runtime.available ? '已检测' : '预留'}`;
+        return `${runtime.name} / ${runtime.available ? '已检测' : '未检测'}`;
       }
       if (!model) return 'AI 未配置';
       return `${providerName(model.provider)} / ${model.model_id || 'model'}`;
@@ -1278,8 +1284,10 @@ createApp({
     const modelStatusClass = computed(() => modelStatusKind.value || '');
     const runtimeStatusClass = computed(() => {
       const rt = selectedRuntime.value;
-      if (!rt || rt.implemented) return 'ok';
-      if (rt.available) return 'loading';
+      if (!rt) return '';
+      if (rt.id === 'api') return 'ok';
+      if (!rt.available) return 'error';
+      if (rt.implemented) return 'ok';
       return 'error';
     });
     const currentProfileHint = computed(() => {
@@ -1292,10 +1300,11 @@ createApp({
       const rt = selectedRuntime.value;
       if (!rt) return '';
       if (rt.id === 'api') return '直接 API 已启用。';
-      if (rt.implemented) return `${rt.name} 已启用。`;
-      const detected = rt.available ? '已检测到命令' : '未检测到命令';
-      return `${rt.name} 已选为运行方式，${detected}；CLI 桥接仍处于预留状态。`;
+      if (!rt.available) return `${rt.name} 未检测到命令；请先安装对应 CLI 并确认命令在 PATH 中。`;
+      if (rt.implemented) return `${rt.name} 已启用；发送后会在当前项目目录执行任务，并注入当前模型的 API Key 环境变量。`;
+      return `${rt.name} 已检测到命令，但当前版本暂未启用。`;
     });
+    const sendButtonLabel = computed(() => currentRuntimeId.value === 'api' ? '发送' : '执行');
     const subagentBindingSummary = computed(() => SUBAGENT_NAMES.map(name => {
       const c = subagent.candidates[subagent.selections[name]];
       if (!c) return { name, label: 'inherit', detail: '未选择，按 inherit 处理' };
@@ -1821,14 +1830,6 @@ createApp({
     async function sendChat() {
       const msg = chatInput.value.trim();
       if (!msg || aiStreaming.value) return;
-      if (currentRuntimeId.value !== 'api') {
-        const rt = selectedRuntime.value;
-        chatHistory.value.push({
-          role: 'assistant',
-          content: `${rt?.name || 'Agent'} 运行方式已预留，CLI 桥接会在下一阶段启用。当前请先选择“直接 API”方案。`,
-        });
-        return;
-      }
       if (!currentProfileKey.value) {
         chatHistory.value.push({ role: 'assistant', content: '请先在设置中添加一个 API 模型。' });
         return;
@@ -1898,9 +1899,10 @@ createApp({
 
     function runtimeState(runtime) {
       const current = currentRuntimeId.value === runtime.id;
-      if (runtime.implemented) return current ? '当前启用' : '可启用';
-      const detected = runtime.available ? '已检测' : '未检测';
-      return current ? `当前启用 · ${detected}` : `${detected} · 预留`;
+      if (runtime.id === 'api') return current ? '当前启用' : '可启用';
+      if (!runtime.available) return current ? '当前选择 · 未检测' : '未检测';
+      if (runtime.implemented) return current ? '当前启用 · 已检测' : '可启用';
+      return current ? '当前选择 · 预留' : '预留';
     }
 
     function selectRuntime(runtimeId) {
@@ -1917,6 +1919,7 @@ createApp({
         model_id: 'deepseek-chat',
         api_key: '',
         protocol: 'openai_chat',
+        env_key: 'DEEPSEEK_API_KEY',
         runtime: 'api',
         roles: ['chat'],
         reasoning_profile: 'max',
@@ -1939,6 +1942,7 @@ createApp({
         model_id: model.model_id || '',
         api_key: '',
         protocol: model.protocol || 'openai_chat',
+        env_key: model.env_key || '',
         runtime: model.runtime || 'api',
         roles: Array.isArray(model.roles) ? [...model.roles] : ['chat'],
         reasoning_profile: model.reasoning_profile || 'max',
@@ -1970,6 +1974,7 @@ createApp({
         api_base: prov.base_url,
         model_id: firstModel,
         protocol: protocol,
+        env_key: prov.env_key || '',
         runtime: 'api',
         reasoning_profile: 'max',
       });
@@ -2041,6 +2046,7 @@ createApp({
         api_base: modelForm.api_base.replace(/\/+$/, ''),
         model_id: modelForm.model_id,
         protocol: modelForm.protocol,
+        env_key: modelForm.env_key.trim(),
         runtime: 'api',
         roles: modelForm.roles.length ? modelForm.roles : ['chat'],
         reasoning_profile: modelForm.reasoning_profile || 'max',
@@ -2185,7 +2191,7 @@ createApp({
       showAdvancedModelSettings, modelForm, modelStatus, modelStatusClass,
       models, runtimes, currentProfileKey, currentRuntimeId, thinkingProfile,
       aiProviders, providerModelIds, providerLabels,
-      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass,
+      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass, sendButtonLabel,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
       savingFile, saveError, fileDialog, deleteConfirm,
       showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,

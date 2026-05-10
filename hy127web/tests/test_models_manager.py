@@ -62,6 +62,7 @@ def test_model_optional_fields_default_to_api_profile(tmp_path):
     assert model["reasoning_profile"] == "max"
     assert model["is_default"] is True
     assert model["orchestration"] == {"enabled": False}
+    assert model["env_key"] == ""
 
 
 def test_default_model_switch_is_exclusive(tmp_path):
@@ -87,3 +88,19 @@ def test_default_model_switch_is_exclusive(tmp_path):
     assert reloaded.get_default_model()["id"] == second["id"]
     assert reloaded.get_model(first["id"])["is_default"] is False
     assert reloaded.get_model(second["id"])["roles"] == ["chat", "planner"]
+
+
+def test_model_env_key_persists(tmp_path):
+    manager = ModelsManager(str(tmp_path / "models.json"), str(tmp_path / "keys"))
+    model = manager.add_model(
+        name="qwen",
+        provider="qwen",
+        api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key="sk-qwen",
+        model_id="qwen3-coder-plus",
+        env_key="DASHSCOPE_API_KEY",
+    )
+
+    reloaded = ModelsManager(str(tmp_path / "models.json"), str(tmp_path / "keys"))
+
+    assert reloaded.get_model(model["id"])["env_key"] == "DASHSCOPE_API_KEY"
