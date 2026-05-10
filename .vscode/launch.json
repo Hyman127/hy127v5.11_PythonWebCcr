@@ -20,6 +20,16 @@
                                "cwd":  "${workspaceFolder}"
                            },
                            {
+                               "name":  "启动 Web 工作台",
+                               "type":  "debugpy",
+                               "request":  "launch",
+                               "program":  "${workspaceFolder}/scripts/dev_start_web.py",
+                               "args":  ["--project-root", "${workspaceFolder}"],
+                               "console":  "integratedTerminal",
+                               "python":  "${workspaceFolder}/.venv/Scripts/python.exe",
+                               "cwd":  "${workspaceFolder}"
+                           },
+                           {
                                "name":  "当前文件 - 调试控制台",
                                "type":  "debugpy",
                                "request":  "launch",

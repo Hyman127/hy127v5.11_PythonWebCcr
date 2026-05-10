@@ -15,13 +15,15 @@ This script:
 import argparse
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
 import time
+import webbrowser
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-GLOBAL_DIR = os.path.join(PROJECT_ROOT, ".hy127web_global")
+GLOBAL_DIR = os.path.join(PROJECT_ROOT, ".web-workbench", "global")
 HUB_PORT = 8800
 
 
@@ -34,6 +36,77 @@ def find_free_port(start: int = 8800) -> int:
             except OSError:
                 continue
     raise RuntimeError("No free port found")
+
+
+def _kill_pid(pid: int):
+    try:
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                           capture_output=True, timeout=5)
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def _find_pid_on_port(port: int) -> int | None:
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(
+                ["netstat", "-ano"], capture_output=True, text=True, timeout=10
+            )
+            for line in result.stdout.splitlines():
+                if f"127.0.0.1:{port}" in line and "LISTENING" in line:
+                    parts = line.split()
+                    return int(parts[-1])
+        else:
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"],
+                capture_output=True, text=True, timeout=10
+            )
+            output = result.stdout.strip()
+            if output:
+                return int(output.splitlines()[0])
+    except Exception:
+        pass
+    return None
+
+
+def kill_stale_hubs():
+    import urllib.request
+
+    runtime_file = os.path.join(GLOBAL_DIR, "hub_runtime.json")
+    killed_pids: set[int] = set()
+
+    if os.path.exists(runtime_file):
+        try:
+            with open(runtime_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            pid = state.get("pid")
+            port = state.get("port")
+            if pid:
+                _kill_pid(pid)
+                killed_pids.add(pid)
+                print(f"[Hy127 Web Dev] Killed stale Hub (PID {pid}, port {port})")
+            os.remove(runtime_file)
+        except Exception:
+            pass
+
+    for port in range(8800, 8850):
+        try:
+            urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/hub/identity", timeout=1
+            )
+            pid = _find_pid_on_port(port)
+            if pid and pid not in killed_pids:
+                _kill_pid(pid)
+                killed_pids.add(pid)
+                print(f"[Hy127 Web Dev] Killed orphan Hub on port {port} (PID {pid})")
+        except Exception:
+            continue
+
+    if killed_pids:
+        time.sleep(0.5)
 
 
 def ensure_env():
@@ -144,6 +217,9 @@ def main():
 
     ensure_env()
 
+    print("[Hy127 Web Dev] Cleaning up stale Hub processes...")
+    kill_stale_hubs()
+
     port = args.port or find_free_port(HUB_PORT)
     print(f"[Hy127 Web Dev] Starting on port {port}")
 
@@ -166,12 +242,14 @@ def main():
 
     code = create_bootstrap_code(port)
     if code:
+        open_url = f"http://127.0.0.1:{port}/bootstrap?code={code}"
         print()
         print("=" * 60)
         print(f"  Open in browser:")
-        print(f"  http://127.0.0.1:{port}/bootstrap?code={code}")
+        print(f"  {open_url}")
         print("=" * 60)
         print()
+        webbrowser.open(open_url)
 
     print("[Hy127 Web Dev] Running. Press Ctrl+C to stop.")
     try:

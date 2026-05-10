@@ -663,14 +663,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
                   </optgroup>
                 </select>
               </label>
-              <label>思考强度
-                <select v-model="thinkingProfile">
-                  <option value="max">最佳质量</option>
-                  <option value="deep">深度</option>
-                  <option value="standard">标准</option>
-                  <option value="quick">快速</option>
-                </select>
-              </label>
+              <label>思考强度</label>
+              <div class="checkbox-row">
+                <label><input type="radio" v-model="thinkingProfile" value="max" /> 最佳质量</label>
+                <label><input type="radio" v-model="thinkingProfile" value="deep" /> 深度</label>
+                <label><input type="radio" v-model="thinkingProfile" value="standard" /> 标准</label>
+                <label><input type="radio" v-model="thinkingProfile" value="quick" /> 快速</label>
+              </div>
             </div>
             <div class="hint">{{ currentProfileHint }}</div>
           </div>
@@ -745,7 +744,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           </template>
           <div class="actions">
             <button class="secondary" @click="deleteModel" :disabled="!modelForm.id">删除</button>
-            <button class="secondary" @click="testModel" :disabled="!modelForm.id">测试</button>
+            <button class="secondary" @click="testModel">测试</button>
             <button @click="saveModel">保存</button>
           </div>
           <div class="status">{{ modelStatus }}</div>
@@ -862,7 +861,10 @@ function apiFetch(url, opts = {}) {
     headers['X-Code880-CSRF'] = getCsrf();
     if (!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
   }
-  return fetch(url, { ...opts, headers, credentials: 'same-origin' });
+  return fetch(url, { ...opts, headers, credentials: 'same-origin' }).catch(err => {
+    const diag = `${err.message}\n  URL: ${url}\n  Origin: ${location.origin}\n  可能原因: Hub 未启动、端口已变更、或 CORS 配置不匹配`;
+    throw new Error(diag);
+  });
 }
 
 createApp({
@@ -2004,13 +2006,26 @@ createApp({
     }
 
     async function testModel() {
-      if (!modelForm.id) {
-        modelStatus.value = '请先保存模型配置';
-        return;
-      }
       modelStatus.value = '正在测试...';
       try {
-        const resp = await apiFetch(`/api/hub/models/${modelForm.id}/test`, { method: 'POST' });
+        let resp;
+        if (modelForm.id) {
+          resp = await apiFetch(`/api/hub/models/${modelForm.id}/test`, { method: 'POST' });
+        } else {
+          if (!modelForm.api_base || !modelForm.model_id || !modelForm.api_key) {
+            modelStatus.value = '请填写 API Base、模型 ID 和 API Key';
+            return;
+          }
+          resp = await apiFetch('/api/hub/models/test-inline', {
+            method: 'POST',
+            body: JSON.stringify({
+              api_base: modelForm.api_base,
+              model_id: modelForm.model_id,
+              api_key: modelForm.api_key,
+              protocol: modelForm.protocol,
+            }),
+          });
+        }
         const data = await resp.json();
         modelStatus.value = data.ok ? '测试通过' : `测试失败: ${data.error || JSON.stringify(data)}`;
       } catch(e) {
