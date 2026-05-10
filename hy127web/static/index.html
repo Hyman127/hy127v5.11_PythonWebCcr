@@ -142,11 +142,17 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .config-body .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
 .config-body label { display: grid; gap: 3px; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; }
 .config-body input, .config-body select { width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
-.model-list { display: grid; gap: 4px; max-height: 120px; overflow-y: auto; }
+.settings-tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--border-color); }
+.settings-tab { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-color); border-bottom: none; padding: 5px 9px; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; }
+.settings-tab.active { background: var(--bg-secondary); color: var(--text-bright); border-color: var(--accent); }
+.settings-tab:disabled { opacity: 0.5; cursor: not-allowed; }
+.settings-panel { padding: 8px 12px 12px; display: grid; gap: 8px; }
+.model-list { display: grid; gap: 4px; max-height: 240px; overflow-y: auto; }
 .model-card { border: 1px solid var(--border-color); background: var(--bg-primary); border-radius: 4px; padding: 6px; cursor: pointer; display: grid; gap: 2px; }
 .model-card.active { border-color: var(--accent); background: rgba(0, 122, 204, 0.15); }
 .model-card .title { display: flex; align-items: center; gap: 6px; color: var(--text-bright); font-size: 12px; }
 .model-card .meta { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-empty { color: var(--text-secondary); font-size: 12px; padding: 8px 0; }
 .pill { border: 1px solid var(--border-color); border-radius: 999px; padding: 0 6px; color: var(--success); font-size: 10px; }
 .advanced-toggle { color: var(--accent); cursor: pointer; font-size: 11px; user-select: none; }
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 8px; color: var(--text-secondary); }
@@ -695,98 +701,119 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             </div>
             <div class="hint">{{ currentProfileHint }}</div>
           </div>
-          <div class="section-title">模型服务</div>
-          <div class="model-list" v-if="models.length">
-            <div class="model-card" v-for="m in models" :key="m.id"
-                 :class="{active: modelForm.id === m.id}" @click="editModel(m)">
-              <div class="title">
-                <span>{{ m.name }}</span>
-                <span class="pill" v-if="m.is_default">默认</span>
+          <div class="settings-tabs">
+            <button class="settings-tab" :class="{active: configTab === 'models'}" @click="configTab = 'models'">已配置 AI</button>
+            <button class="settings-tab" :class="{active: configTab === 'form'}" @click="configTab = 'form'">{{ modelForm.id ? '编辑 API Key' : '新增 API Key' }}</button>
+            <button class="settings-tab" :class="{active: configTab === 'runtime'}" @click="configTab = 'runtime'">运行方式</button>
+          </div>
+
+          <div class="settings-panel" v-if="configTab === 'models'">
+            <div class="section-title">已配置 AI</div>
+            <div class="model-list" v-if="models.length">
+              <div class="model-card" v-for="m in models" :key="m.id"
+                   :class="{active: modelForm.id === m.id}" @click="editModel(m)">
+                <div class="title">
+                  <span>{{ m.name }}</span>
+                  <span class="pill" v-if="m.is_default">默认</span>
+                  <span class="pill" v-if="currentProfileKey === 'api:' + m.id">当前</span>
+                </div>
+                <div class="meta">{{ providerName(m.provider) }} / {{ m.model_id }}</div>
+                <div class="meta">{{ m.roles?.join(' · ') || 'chat' }} · {{ m.api_key_masked || '未保存 Key' }} · {{ modelEnvKey(m) || 'env 自动' }}</div>
               </div>
-              <div class="meta">{{ providerName(m.provider) }} / {{ m.model_id }}</div>
-              <div class="meta">{{ m.roles?.join(' · ') || 'chat' }} · {{ m.api_key_masked || '未保存 Key' }}</div>
             </div>
+            <div class="model-empty" v-else>暂无已配置 AI</div>
+            <div class="actions">
+              <button class="secondary" @click="refreshModelConfig">刷新</button>
+              <button @click="newModel">新增模型</button>
+            </div>
+            <div class="status" :class="modelStatusClass" v-if="modelStatus">{{ modelStatus }}</div>
+            <div class="status">{{ subagentModelImpactHint }}</div>
           </div>
-          <div class="actions">
-            <button class="secondary" @click="newModel">新增模型</button>
-          </div>
-          <div class="row">
-            <label>服务商
-              <select v-model="modelForm.provider" @change="applyProviderPreset">
-                <option v-for="p in aiProviders" :key="p.key" :value="p.key">{{ p.display_name }}</option>
-                <option value="custom">自定义</option>
+
+          <div class="settings-panel" v-else-if="configTab === 'form'">
+            <div class="section-title">{{ modelForm.id ? '编辑模型 API Key' : '新增模型 API Key' }}</div>
+            <div class="row">
+              <label>服务商
+                <select v-model="modelForm.provider" @change="applyProviderPreset">
+                  <option v-for="p in aiProviders" :key="p.key" :value="p.key">{{ p.display_name }}</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+              <label>名称
+                <input v-model="modelForm.name" placeholder="DeepSeek Chat" />
+              </label>
+            </div>
+            <label>API Base
+              <input v-model="modelForm.api_base" placeholder="https://api.deepseek.com" />
+            </label>
+            <label>模型 ID
+              <select v-if="modelForm.provider !== 'custom' && providerModelIds.length" v-model="modelForm.model_id">
+                <option v-for="mid in providerModelIds" :key="mid" :value="mid">{{ mid }}</option>
               </select>
+              <input v-else v-model="modelForm.model_id" placeholder="deepseek-chat" />
             </label>
-            <label>名称
-              <input v-model="modelForm.name" placeholder="DeepSeek Chat" />
+            <label>API Key
+              <input v-model="modelForm.api_key" type="password" placeholder="保存后仅显示掩码；留空表示不修改" />
             </label>
-          </div>
-          <label>API Base
-            <input v-model="modelForm.api_base" placeholder="https://api.deepseek.com" />
-          </label>
-          <label>模型 ID
-            <select v-if="modelForm.provider !== 'custom' && providerModelIds.length" v-model="modelForm.model_id">
-              <option v-for="mid in providerModelIds" :key="mid" :value="mid">{{ mid }}</option>
-            </select>
-            <input v-else v-model="modelForm.model_id" placeholder="deepseek-chat" />
-          </label>
-          <label>API Key
-            <input v-model="modelForm.api_key" type="password" placeholder="保存后仅显示掩码；留空表示不修改" />
-          </label>
-          <div class="advanced-toggle" @click="showAdvancedModelSettings = !showAdvancedModelSettings">
-            {{ showAdvancedModelSettings ? '收起高级设置' : '高级设置（可不填）' }}
-          </div>
-          <template v-if="showAdvancedModelSettings">
-            <div class="row">
-              <label>协议
-                <select v-model="modelForm.protocol">
-                  <option value="openai_chat">OpenAI-compatible</option>
-                  <option value="anthropic_messages">Anthropic-compatible</option>
-                  <option value="gemini_openai">Gemini</option>
-                </select>
-              </label>
-              <label>环境变量 Key
-                <input v-model="modelForm.env_key" placeholder="如 DASHSCOPE_API_KEY / GEMINI_API_KEY" />
-              </label>
+            <div class="advanced-toggle" @click="showAdvancedModelSettings = !showAdvancedModelSettings">
+              {{ showAdvancedModelSettings ? '收起高级设置' : '高级设置（可不填）' }}
             </div>
-            <div class="row">
-              <label>默认思考
-                <select v-model="modelForm.reasoning_profile">
-                  <option value="max">最佳质量</option>
-                  <option value="deep">深度</option>
-                  <option value="standard">标准</option>
-                  <option value="quick">快速</option>
-                </select>
-              </label>
+            <template v-if="showAdvancedModelSettings">
+              <div class="row">
+                <label>协议
+                  <select v-model="modelForm.protocol">
+                    <option value="openai_chat">OpenAI-compatible</option>
+                    <option value="anthropic_messages">Anthropic-compatible</option>
+                    <option value="gemini_openai">Gemini</option>
+                  </select>
+                </label>
+                <label>环境变量 Key
+                  <input v-model="modelForm.env_key" placeholder="如 DASHSCOPE_API_KEY / GEMINI_API_KEY" />
+                </label>
+              </div>
+              <div class="row">
+                <label>默认思考
+                  <select v-model="modelForm.reasoning_profile">
+                    <option value="max">最佳质量</option>
+                    <option value="deep">深度</option>
+                    <option value="standard">标准</option>
+                    <option value="quick">快速</option>
+                  </select>
+                </label>
+              </div>
+              <div class="checkbox-row">
+                <label><input type="checkbox" value="chat" v-model="modelForm.roles" /> 对话</label>
+                <label><input type="checkbox" value="planner" v-model="modelForm.roles" /> 规划</label>
+                <label><input type="checkbox" value="executor" v-model="modelForm.roles" /> 执行</label>
+                <label><input type="checkbox" value="reviewer" v-model="modelForm.roles" /> 审核</label>
+              </div>
+              <div class="checkbox-row">
+                <label><input type="checkbox" v-model="modelForm.is_default" /> 设为默认模型</label>
+              </div>
+            </template>
+            <div class="actions">
+              <button class="secondary" @click="deleteModel" :disabled="!modelForm.id">删除</button>
+              <button class="secondary" @click="testModel">测试</button>
+              <button @click="saveModel">保存</button>
             </div>
-            <div class="checkbox-row">
-              <label><input type="checkbox" value="chat" v-model="modelForm.roles" /> 对话</label>
-              <label><input type="checkbox" value="planner" v-model="modelForm.roles" /> 规划</label>
-              <label><input type="checkbox" value="executor" v-model="modelForm.roles" /> 执行</label>
-              <label><input type="checkbox" value="reviewer" v-model="modelForm.roles" /> 审核</label>
-            </div>
-            <div class="checkbox-row">
-              <label><input type="checkbox" v-model="modelForm.is_default" /> 设为默认模型</label>
-            </div>
-          </template>
-          <div class="actions">
-            <button class="secondary" @click="deleteModel" :disabled="!modelForm.id">删除</button>
-            <button class="secondary" @click="testModel">测试</button>
-            <button @click="saveModel">保存</button>
+            <div class="status" :class="modelStatusClass">{{ modelStatus }}</div>
           </div>
-          <div class="status" :class="modelStatusClass">{{ modelStatus }}</div>
-          <div class="section-title">运行方式</div>
-          <div class="runtime-list">
-            <button type="button" class="runtime-item" v-for="r in runtimes" :key="r.id"
-                    :class="{active: currentRuntimeId === r.id}" @click="selectRuntime(r.id)">
-              <span class="main">
-                <span class="name">{{ r.name }}</span>
-                <span class="desc">{{ r.description }}</span>
-              </span>
-              <span class="state" :class="{current: currentRuntimeId === r.id}">{{ runtimeState(r) }}</span>
-            </button>
+
+          <div class="settings-panel" v-else>
+            <div class="section-title">运行方式</div>
+            <div class="runtime-list">
+              <button type="button" class="runtime-item" v-for="r in runtimes" :key="r.id"
+                      :class="{active: currentRuntimeId === r.id}" @click="selectRuntime(r.id)">
+                <span class="main">
+                  <span class="name">{{ r.name }}</span>
+                  <span class="desc">{{ r.description }}</span>
+                </span>
+                <span class="state" :class="{current: currentRuntimeId === r.id}">{{ runtimeState(r) }}</span>
+              </button>
+            </div>
+            <div class="status" :class="runtimeStatusClass">{{ currentRuntimeHint }}</div>
+            <div class="status">{{ runtimeModelHint }}</div>
           </div>
-          <div class="status" :class="runtimeStatusClass">{{ currentRuntimeHint }}</div>
         </div>
         </template>
       </div>
@@ -929,6 +956,7 @@ createApp({
     const chatMessages = ref(null);
     const showModelSettings = ref(false);
     const showAdvancedModelSettings = ref(false);
+    const configTab = ref('models');
     const modelStatus = ref('');
     const modelStatusKind = ref('');
     const models = ref([]);
@@ -1252,6 +1280,13 @@ createApp({
       map.custom = '自定义';
       return map;
     });
+    const providerByKey = computed(() => {
+      const map = {};
+      for (const p of aiProviders.value) {
+        map[p.key] = p;
+      }
+      return map;
+    });
     const apiProfiles = computed(() => {
       const enabled = models.value.filter(m => m.enabled !== false);
       if (!enabled.length) return [{ key: '', label: '请先添加 API 模型', disabled: true }];
@@ -1294,7 +1329,7 @@ createApp({
       if (!currentProfileKey.value) return '请先在设置中添加一个 API 模型。';
       const model = selectedModel.value;
       if (!model) return '';
-      return `当前模型：${model.name}；运行方式在下方单独切换。`;
+      return `当前模型：${model.name}；运行方式在独立 tab 中切换。`;
     });
     const currentRuntimeHint = computed(() => {
       const rt = selectedRuntime.value;
@@ -1303,6 +1338,17 @@ createApp({
       if (!rt.available) return `${rt.name} 未检测到命令；请先安装对应 CLI 并确认命令在 PATH 中。`;
       if (rt.implemented) return `${rt.name} 已启用；发送后会在当前项目目录执行任务，并注入当前模型的 API Key 环境变量。`;
       return `${rt.name} 已检测到命令，但当前版本暂未启用。`;
+    });
+    const runtimeModelHint = computed(() => {
+      const model = selectedModel.value;
+      if (!model) return '运行方式需要先选择一个当前模型。';
+      const envKey = modelEnvKey(model) || '按服务商默认环境变量';
+      return `运行模型：${model.name} / ${model.model_id}；Key 注入：${envKey}`;
+    });
+    const subagentModelImpactHint = computed(() => {
+      const enabledCount = models.value.filter(m => m.enabled !== false).length;
+      const state = subagent.loaded ? 'Sub-agent 候选会随模型变更刷新' : 'Sub-agent 打开时会读取这些模型';
+      return `已启用 ${enabledCount} 个模型；${state}。`;
     });
     const sendButtonLabel = computed(() => currentRuntimeId.value === 'api' ? '发送' : '执行');
     const subagentBindingSummary = computed(() => SUBAGENT_NAMES.map(name => {
@@ -1897,6 +1943,11 @@ createApp({
       return providerLabels.value[provider] || provider || 'Custom';
     }
 
+    function modelEnvKey(model) {
+      if (!model) return '';
+      return model.env_key || providerByKey.value[model.provider]?.env_key || '';
+    }
+
     function runtimeState(runtime) {
       const current = currentRuntimeId.value === runtime.id;
       if (runtime.id === 'api') return current ? '当前启用' : '可启用';
@@ -1929,11 +1980,12 @@ createApp({
 
     function newModel() {
       resetModelForm();
+      configTab.value = 'form';
       modelStatusKind.value = '';
       modelStatus.value = '正在新增模型，请填写 API Key 后保存';
     }
 
-    function editModel(model) {
+    function editModel(model, switchToForm = true) {
       Object.assign(modelForm, {
         id: model.id,
         name: model.name || '',
@@ -1948,6 +2000,7 @@ createApp({
         reasoning_profile: model.reasoning_profile || 'max',
         is_default: !!model.is_default,
       });
+      if (switchToForm) configTab.value = 'form';
       modelStatusKind.value = '';
       modelStatus.value = `已选择: ${model.name} (${model.api_key_masked || 'key 已保存'})`;
     }
@@ -1990,7 +2043,8 @@ createApp({
           || models.value.find(m => m.enabled !== false)
           || models.value[0];
         if (model) {
-          editModel(model);
+          const currentFormModel = modelForm.id ? models.value.find(m => m.id === modelForm.id) : null;
+          editModel(currentFormModel || model, false);
         } else {
           resetModelForm();
           modelStatusKind.value = '';
@@ -2026,6 +2080,25 @@ createApp({
         aiProviders.value = data.providers || [];
       } catch(e) {
         // silently fail; modelForm defaults still work
+      }
+    }
+
+    async function refreshSubagentModelCandidates() {
+      if (!subagent.loaded) return;
+      await loadSubagentPanel();
+    }
+
+    async function refreshModelConfig() {
+      modelStatusKind.value = 'loading';
+      modelStatus.value = '正在刷新模型配置...';
+      try {
+        await Promise.all([loadModels(), loadAiProviders()]);
+        await refreshSubagentModelCandidates();
+        modelStatusKind.value = 'ok';
+        modelStatus.value = '模型配置已刷新';
+      } catch(e) {
+        modelStatusKind.value = 'error';
+        modelStatus.value = `刷新失败: ${e}`;
       }
     }
 
@@ -2072,6 +2145,7 @@ createApp({
         modelForm.id = data.id;
         modelForm.api_key = '';
         await loadModels();
+        await refreshSubagentModelCandidates();
         currentProfileKey.value = `api:${data.id}`;
         modelStatusKind.value = 'ok';
         modelStatus.value = `已保存: ${data.name} (${data.api_key_masked || 'key 已保存'})`;
@@ -2095,6 +2169,8 @@ createApp({
         }
         resetModelForm();
         await loadModels();
+        await refreshSubagentModelCandidates();
+        configTab.value = 'models';
         modelStatusKind.value = 'ok';
         modelStatus.value = '已删除';
       } catch(e) {
@@ -2188,19 +2264,19 @@ createApp({
       subagent, subagentAgentNames, loadSubagentPanel, checkCcr, saveSubagentBinding, wizardAllInherit, wizardCcrPreferred, wizardApplyAll, wizardCopyCmd, refreshSubagentRendered,
       subagentCandidateDetail, subagentBindingSummary,
       showAI, chatHistory, chatInput, aiStreaming, streamBuffer, contextFiles, chatMessages,
-      showAdvancedModelSettings, modelForm, modelStatus, modelStatusClass,
+      showAdvancedModelSettings, configTab, modelForm, modelStatus, modelStatusClass,
       models, runtimes, currentProfileKey, currentRuntimeId, thinkingProfile,
       aiProviders, providerModelIds, providerLabels,
-      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass, sendButtonLabel,
+      apiProfiles, currentProfileHint, currentRuntimeHint, runtimeStatusClass, runtimeModelHint, subagentModelImpactHint, sendButtonLabel,
       contextMenu, activeSheetIdx, currentSheet, currentModelLabel,
       savingFile, saveError, fileDialog, deleteConfirm,
       showGitPanel, gitAvailable, gitStatus, gitDiff, gitBranch, gitLog, gitCommitDraft, gitLoading,
       openProject, goHome, loadWorkspace, onFileSelect, onDirToggle,
       switchFile, closeFile, runFile, stopRun, sendStdin, clearTerminal,
       sendChat, clearChat, startNewConversation, toggleAI, applyProviderPreset,
-      loadModels, loadRuntimes, saveModel, testModel, deleteModel, newModel, editModel,
+      loadModels, loadRuntimes, refreshModelConfig, saveModel, testModel, deleteModel, newModel, editModel,
       providerName, runtimeState, updateContext, renderMd,
-      selectRuntime,
+      modelEnvKey, selectRuntime,
       onFileContextMenu, runContextFile, copyPath, getPreviewUrl,
       addTerminalLine,
       saveActiveFile, markDirty,
